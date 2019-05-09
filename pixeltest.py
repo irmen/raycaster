@@ -28,6 +28,7 @@ class RaycasterWindow(tkinter.Tk):
         self.imageTk = ImageTk.PhotoImage(self.raycaster.image.resize(
             (self.PIXEL_WIDTH*self.PIXEL_SCALE, self.PIXEL_HEIGHT*self.PIXEL_SCALE), Image.NEAREST))
         self.label.configure(image=self.imageTk)
+        self.update_idletasks()
 
     def redraw(self):
         self.raycaster.tick(int(time.monotonic() * 1000) - self.time_msec_epoch)
@@ -36,7 +37,10 @@ class RaycasterWindow(tkinter.Tk):
         fps = 1/(now - self.perf_timestamp)
         self.perf_timestamp = now
         self.wm_title(f"pure Python raycaster  -  {fps:.0f} fps")
-        self.after_idle(self.redraw)
+        if fps < 30:
+            self.after_idle(self.redraw)
+        else:
+            self.after(2, self.redraw)
 
 
 class Texture:
@@ -66,21 +70,23 @@ class Raycaster:
             "floor": Texture("floor.png"),
             "ceiling": Texture("ceiling.png"),
         }
+        self.frame = 0
 
     def tick(self, walltime_msec: float) -> None:
         self.clear_zbuffer()
+        self.frame += 1
         eye_height = self.pixheight * 2 // 3      # @todo real 3d coordinates
         for x in range(self.pixwidth):
             # draw ceiling
             tex = self.textures["ceiling"]
             for y in range(0, self.pixheight - eye_height):
-                rgb = tex.get(x, y)
+                rgb = tex.get(x + walltime_msec//20, y)
                 z = 1000*y/(self.pixheight - eye_height)        # @todo based on real 3d distance
                 self.set_pixel((x, y), z, rgb)
             # draw floor
             tex = self.textures["floor"]
             for y in range(self.pixheight - eye_height, self.pixheight):
-                rgb = tex.get(x, y)
+                rgb = tex.get(x - walltime_msec//20, y)
                 z = 1000 * (self.pixheight - y) / eye_height     # @todo based on real 3d distance
                 self.set_pixel((x, y), z, rgb)
 
