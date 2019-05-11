@@ -29,10 +29,8 @@ is only able to draw corridors that all have the same floor level and height.
 The camera is the only thing that has a 3d coordinate in the world (x,y,z):
 the position in the world is (x,y) and the Z coordinate is the height of the camera
 above the ground level, in meters.
-Assuming no head-bobbing, this height will be a fixed value. 
-Also because each 'square' on the ground is 1x1 meters the player person should really
-not be of human size because they won't fit in the corridors. Let's assume a dwarf size 
-of 0.70 centimeters.
+To simplify rendering, we assume the camera is at half height so that
+the ceiling and floor are the same sizes and perspective.
 
 Where the camera is pointing to is given by another -normalized- 2d vector (x,y). 
 The implicit Z axis of the viewing angle vector is always zero because

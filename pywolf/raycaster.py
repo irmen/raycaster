@@ -22,14 +22,20 @@ class Texture:
                 column = [img.getpixel((x, y)) for y in range(self.SIZE)]
                 self.pixels.append(column)
 
-    def get(self, x: float, y: float) -> Tuple[int, int, int]:
-        return self.pixels[int(y) & (self.SIZE - 1)][int(x) & (self.SIZE - 1)]
+    def get(self, x: int, y: int) -> Tuple[int, int, int]:
+        return self.pixels[x][y]
+
+    def get_f(self, x: float, y: float) -> Tuple[int, int, int]:
+        # if x < 0.0 or x > 1.0:
+        #     raise ValueError("tex x out of range: "+str(x))
+        # if y < 0.0 or y > 1.0:
+        #     raise ValueError("tex y out of range: "+str(y))
+        return self.pixels[int(x*self.SIZE)][int(y*self.SIZE)]
 
 
 class Raycaster:
     FOV = math.radians(70)
-    CAMERA_HEIGHT = 0.7
-    BLACK_DISTANCE = 5.0
+    BLACK_DISTANCE = 6.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -37,6 +43,7 @@ class Raycaster:
         self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
         self.textures = {
+            "test": Texture(pkgutil.get_data(__name__, "textures/test.png")),
             "floor": Texture(pkgutil.get_data(__name__, "textures/floor.png")),
             "ceiling": Texture(pkgutil.get_data(__name__, "textures/ceiling.png")),
             "wall-bricks": Texture(pkgutil.get_data(__name__, "textures/wall-bricks.png")),
@@ -78,41 +85,50 @@ class Raycaster:
         return m2
 
     def tick(self, walltime_msec: float) -> None:
-        self.clear_zbuffer()
+        # self.clear_zbuffer()        # TODO actually use the z-buffer for something useful
         self.frame += 1
         # raycast all pixel columns
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
-            if wall > 0:
-                texture = self.wall_textures[wall]
-                if not texture:
-                    raise RuntimeError("map specifies unknown wall texture " + str(wall))
-                y_top = int(math.sin(x/10) * 10) + 20
-                y_bottom = int(math.cos(x/7) * 20) + 70
-                dty = texture.SIZE / (y_bottom - y_top)
+            if 0 < distance <= self.BLACK_DISTANCE:
+                wall_height = int(self.pixheight / distance)
+                if wall_height < self.pixheight:
+                    # column fits on the screen; no clipping
+                    y_top = (self.pixheight - wall_height) // 2
+                    y_bottom = (self.pixheight + wall_height) // 2 - 1
+                    texture_y = 0.0
+                else:
+                    # column extends outside the screen; clip it
+                    y_top = 0
+                    y_bottom = self.pixheight-1
+                    texture_y = 0.5 - self.pixheight/wall_height/2
                 self.draw_ceiling(x, y_top-1, distance)
-                self.draw_wall_column(x, y_top, y_bottom, distance, texture, texture_x, dty)
+                if wall > 0:
+                    texture = self.textures["test"]  # XXX self.wall_textures[wall]
+                    if not texture:
+                        raise KeyError("map specifies unknown wall texture " + str(wall))
+                    self.draw_wall_column(x, y_top, y_bottom, wall_height, distance, texture, texture_x, texture_y)
                 self.draw_floor(x, y_bottom+1, distance)
-            else:
-                # no wall hit
-                # todo draw ceiling / floor
-                pass
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
-        return 2, self.BLACK_DISTANCE*abs(1.0-2.0*pixel_x/self.pixwidth), pixel_x
+        # TODO cast ray: find wall, distance, walltexture x-coordinate
+        tx = (pixel_x/self.pixwidth * 4) % 1.0
+        return 2, 0.5+self.BLACK_DISTANCE*abs(1.0-2.0*pixel_x/self.pixwidth), tx
 
-    def draw_wall_column(self, x: int, y_top: int, y_bottom: int, z: float,
-                         texture: Texture, tx: float, dty: float) -> None:
-        ty = 0.0
+    def draw_wall_column(self, x: int, y_top: int, y_bottom: int, column_height: int, distance: float,
+                         texture: Texture, tx: float, ty: float) -> None:
+        dty = 1.0/column_height
         for y in range(y_top, y_bottom+1):
-            self.set_pixel(x, y, z, texture.get(tx, ty))
+            self.set_pixel(x, y, distance, texture.get_f(tx, ty))
             ty += dty
 
     def draw_ceiling(self, x: int, y_end: int, z: float) -> None:
+        # TODO draw ceiling texture
         for y in range(y_end+1):
             self.set_pixel(x, y, z, (20, 100, 255))
 
     def draw_floor(self, x: int, y_start: int, z: float) -> None:
+        # TODO draw floor texture
         for y in range(y_start, self.pixheight):
             self.set_pixel(x, y, z, (0, 160, 20))
 
@@ -145,13 +161,17 @@ class Raycaster:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel is darkened according to its z-value, the distance.
         If rgb is None, the pixel is transparent instead of having a color."""
-        if z <= self.zbuffer[x][y]:
-            if rgb:
-                if z > 0:
-                    bz = 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE
-                    rgb = self.rgb_brightness(rgb, bz)
-                self.image.putpixel((x, y), rgb)
-            self.zbuffer[x][y] = z
+        # TODO use the z-buffer (for now we ignore it because there's nothing using it at the moment)
+        # if z <= self.zbuffer[x][y]:
+        #     self.zbuffer[x][y] = z
+        #     if rgb:
+        #         if z > 0:
+        #             rgb = self.rgb_brightness(rgb, bz = 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE)
+        #         self.image.putpixel((x, y), rgb)
+        if rgb:
+            if z > 0:
+                rgb = self.rgb_brightness(rgb, 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE)
+            self.image.putpixel((x, y), rgb)
 
     def rgb_brightness(self, rgb: Tuple[int, int, int], scale: float) -> Tuple[int, int, int]:
         """adjust brightness of the color. scale 0=black, 1=neutral, >1 = whiter. (clamped at 0..255)"""
