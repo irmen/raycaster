@@ -85,7 +85,7 @@ class RaycasterWindow(tkinter.Tk):
     def mouse_move(self, e):
         mousex = self.winfo_pointerx() - self.winfo_rootx()
         mousex -= self.winfo_width()//2
-        self.raycaster.rotate_player_absolute(math.pi/2.0 + 2.0 * math.pi * -mousex / 800.0)
+        self.raycaster.rotate_player_to(math.pi / 2.0 + 2.0 * math.pi * -mousex / 800.0)
 
     def update_gui_image(self):
         self.imageTk = ImageTk.PhotoImage(self.raycaster.image.resize(

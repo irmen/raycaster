@@ -2,65 +2,62 @@ from math import sin, cos, atan2, sqrt
 
 
 class Vec2:
-    def __init__(self, x, y):
+    def __init__(self, x: float, y: float) -> None:
         self.x = x
         self.y = y
 
     @classmethod
-    def from_angle(cls, radians):
+    def from_angle(cls, radians: float) -> "Vec2":
         return cls(cos(radians), sin(radians))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.x}, {self.y})"
 
-    def __abs__(self):
+    def __abs__(self) -> float:
         return self.magnitude()
 
-    def magnitude(self):
+    def magnitude(self) -> float:
         return sqrt(self.x*self.x + self.y*self.y)
 
-    def normalized(self):
+    def normalized(self) -> "Vec2":
         if self.x == 0 and self.y == 0:
             return self
         mag = self.magnitude()
         return Vec2(self.x / mag, self.y / mag)
 
-    def angle(self):
+    def angle(self) -> float:
         return atan2(self.y, self.x)
 
-    def __neg__(self):
+    def __neg__(self) -> "Vec2":
         return Vec2(-self.x, -self.y)
 
-    def __add__(self, other):
+    def __add__(self, other: "Vec2") -> "Vec2":
         if isinstance(other, Vec2):
             return Vec2(self.x+other.x, self.y+other.y)
         else:
             raise TypeError("can only add another Vec2d", other)
 
-    def __radd__(self, other):
-        return self + other
-
-    def __sub__(self, other):
+    def __sub__(self, other: "Vec2") -> "Vec2":
         if isinstance(other, Vec2):
             return Vec2(self.x-other.x, self.y-other.y)
         else:
             raise TypeError("can only sub another Vec2d", other)
 
-    def __mul__(self, scalar):
+    def __mul__(self, scalar: float) -> "Vec2":
         return Vec2(self.x*scalar, self.y*scalar)
 
-    def __rmul__(self, scalar):
+    def __rmul__(self, scalar: float) -> "Vec2":
         return Vec2(self.x*scalar, self.y*scalar)
 
-    def __truediv__(self, scalar):
+    def __truediv__(self, scalar: float) -> "Vec2":
         return Vec2(self.x/scalar, self.y/scalar)
 
-    def dotproduct(self, other):
+    def dotproduct(self, other: "Vec2") -> float:
         return self.x*other.x + self.y*other.y
 
-    def rotate(self, radians):
-        x2 = self.x * cos(radians) - self.y * sin(radians)
-        y2 = self.y * cos(radians) + self.x * sin(radians)
+    def rotate(self, angle: float) -> None:
+        x2 = self.x * cos(angle) - self.y * sin(angle)
+        y2 = self.y * cos(angle) + self.x * sin(angle)
         self.x = x2
         self.y = y2
 
