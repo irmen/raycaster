@@ -16,6 +16,9 @@ Could be another power of 2, but settled on 64x64 considering the display size a
 The world is an infinite 2d plane (x,y) in *meter* units (or 'squares' if you wish)
 (x,y) are coordinates on the ground plane, the fictional z coordinate
 is the height above the ground.
+It uses the regular mathematical axis orientation so the positive X axis is to the right,
+and the positive Y axis is up.  This usually means the (0, 0) word map coordinate
+corresponds to the bottom left corner in a minimap display on the screen.
 
 In describing the world, the Z coordinate is not used at all because the ray caster
 is only able to draw corridors that all have the same floor level and height.

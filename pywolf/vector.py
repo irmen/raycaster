@@ -1,79 +1,68 @@
-from math import sin, cos
+from math import sin, cos, atan2, sqrt
 
 
 class Vec2:
     def __init__(self, x, y):
-        self.xy = complex(x, y)
+        self.x = x
+        self.y = y
 
     @classmethod
-    def fromcomplex(cls, cplx):
-        return cls(cplx.real, cplx.imag)
+    def from_angle(cls, radians):
+        return cls(cos(radians), sin(radians))
 
     def __str__(self):
-        return f"({self.xy.real}, {self.xy.imag})"
+        return f"({self.x}, {self.y})"
 
     def __abs__(self):
-        return abs(self.xy)
+        return self.magnitude()
 
     def magnitude(self):
-        return abs(self.xy)
+        return sqrt(self.x*self.x + self.y*self.y)
 
     def normalized(self):
-        return self.fromcomplex(self.xy / abs(self.xy))
+        if self.x == 0 and self.y == 0:
+            return self
+        mag = self.magnitude()
+        return Vec2(self.x / mag, self.y / mag)
 
-    @property
-    def x(self):
-        return self.xy.real
+    def angle(self):
+        return atan2(self.y, self.x)
 
-    @x.setter
-    def x(self, value):
-        self.xy = complex(value, self.xy.imag)
-
-    @property
-    def y(self):
-        return self.xy.imag
-
-    @y.setter
-    def y(self, value):
-        self.xy = complex(self.xy.real, value)
+    def __neg__(self):
+        return Vec2(-self.x, -self.y)
 
     def __add__(self, other):
         if isinstance(other, Vec2):
-            return self.fromcomplex(self.xy + other.xy)
+            return Vec2(self.x+other.x, self.y+other.y)
         else:
-            raise TypeError("can only add another Vec2d")
+            raise TypeError("can only add another Vec2d", other)
 
     def __radd__(self, other):
         return self + other
 
     def __sub__(self, other):
         if isinstance(other, Vec2):
-            return self.fromcomplex(self.xy - other.xy)
+            return Vec2(self.x-other.x, self.y-other.y)
         else:
-            raise TypeError("can only sub another Vec2d")
-
-    def __rsub__(self, other):
-        return (-self) + other
+            raise TypeError("can only sub another Vec2d", other)
 
     def __mul__(self, scalar):
-        return self.fromcomplex(self.xy * scalar)
+        return Vec2(self.x*scalar, self.y*scalar)
 
     def __rmul__(self, scalar):
-        return self.fromcomplex(self.xy * scalar)
+        return Vec2(self.x*scalar, self.y*scalar)
 
     def __truediv__(self, scalar):
-        return self.fromcomplex(self.xy / scalar)
-
-    def __neg__(self):
-        return self.fromcomplex(-self.xy)
+        return Vec2(self.x/scalar, self.y/scalar)
 
     def dotproduct(self, other):
         return self.x*other.x + self.y*other.y
 
     def rotate(self, radians):
-        x2 = self.xy.real * cos(radians) - self.xy.imag * sin(radians)
-        y2 = self.xy.imag * cos(radians) + self.xy.real * sin(radians)
-        self.xy = complex(x2, y2)
+        x2 = self.x * cos(radians) - self.y * sin(radians)
+        y2 = self.y * cos(radians) + self.x * sin(radians)
+        self.x = x2
+        self.y = y2
 
 
 if __name__ == "__main__":
@@ -104,13 +93,13 @@ if __name__ == "__main__":
     v = v - v
     v -= v
     v = -v
-    v1=Vec2(2,-5)
-    v2=Vec2(0,4)
-    v3=Vec2(-3,1)
+    v1 = Vec2(2, -5)
+    v2 = Vec2(0, 4)
+    v3 = Vec2(-3, 1)
     print(v1.dotproduct(v3))
     print(v3.dotproduct(v2))
     from math import pi
-    v2 = Vec2(1,0)
+    v2 = Vec2(1, 0)
     print(v2)
     v2.rotate(pi/4)
     print(v2)
