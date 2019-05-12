@@ -1,8 +1,8 @@
-from io import BytesIO
-from PIL import Image
-from typing import Tuple, List, Optional
 import pkgutil
-import math
+import io
+from math import pi, tan, radians, modf
+from typing import Tuple, List, Optional
+from PIL import Image
 from .vector import Vec2
 
 
@@ -12,7 +12,7 @@ class Texture:
     def __init__(self, imagedata: Optional[bytes]) -> None:
         if not imagedata:
             raise ValueError("no image data loaded")
-        with Image.open(BytesIO(imagedata)) as img:
+        with Image.open(io.BytesIO(imagedata)) as img:
             if img.size != (self.SIZE, self.SIZE):
                 raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
             if img.mode != "RGB":
@@ -22,20 +22,22 @@ class Texture:
                 column = [img.getpixel((x, y)) for y in range(self.SIZE)]
                 self.pixels.append(column)
 
-    def get(self, x: int, y: int) -> Tuple[int, int, int]:
-        return self.pixels[x][y]
-
-    def get_f(self, x: float, y: float) -> Tuple[int, int, int]:
-        # if x < 0.0 or x > 1.0:
-        #     raise ValueError("tex x out of range: "+str(x))
-        # if y < 0.0 or y > 1.0:
-        #     raise ValueError("tex y out of range: "+str(y))
-        return self.pixels[int(x*self.SIZE)][int(y*self.SIZE)]
+    def sample(self, x: float, y: float, interpolate: bool) -> Tuple[int, int, int]:
+        """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
+        tx = x * self.SIZE
+        ty = y * self.SIZE
+        p1 = self.pixels[int(tx)][int(ty)]
+        if interpolate:
+            # TODO weighted interpolation instead of 0.5/0.5
+            p2 = self.pixels[int(tx+0.5)][int(ty+0.5)]
+            return (p1[0]+p2[0])//2, (p1[1]+p2[1])//2, (p1[2]+p2[2])//2
+        return p1
 
 
 class Raycaster:
-    FOV = math.radians(70)
+    FOV = radians(70)
     BLACK_DISTANCE = 6.0
+    TEXTURE_INTERPOLATE = True
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -53,7 +55,7 @@ class Raycaster:
         self.frame = 0
         self.player_coords = Vec2(0, 0)
         self.player_direction = Vec2(0, 1)       # always normalized to length 1
-        self.camera_plane = Vec2(math.tan(self.FOV/2), 0)
+        self.camera_plane = Vec2(tan(self.FOV/2), 0)
         self.map = self.load_map()      # rows, so map[y][x] to get a square
 
     def load_map(self) -> List[bytearray]:
@@ -104,7 +106,7 @@ class Raycaster:
                     texture_y = 0.5 - self.pixheight/wall_height/2
                 self.draw_ceiling(x, y_top-1, distance)
                 if wall > 0:
-                    texture = self.textures["test"]  # XXX self.wall_textures[wall]
+                    texture = self.textures["test"] # XXX self.wall_textures[wall]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
                     self.draw_wall_column(x, y_top, y_bottom, wall_height, distance, texture, texture_x, texture_y)
@@ -113,13 +115,14 @@ class Raycaster:
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO cast ray: find wall, distance, walltexture x-coordinate
         tx = (pixel_x/self.pixwidth * 4) % 1.0
-        return 2, 0.5+self.BLACK_DISTANCE*abs(1.0-2.0*pixel_x/self.pixwidth), tx
+        distance = 0.2+self.BLACK_DISTANCE*abs(1.0-2.0*pixel_x/self.pixwidth) + self.frame/120
+        return 2, distance, tx
 
     def draw_wall_column(self, x: int, y_top: int, y_bottom: int, column_height: int, distance: float,
                          texture: Texture, tx: float, ty: float) -> None:
         dty = 1.0/column_height
         for y in range(y_top, y_bottom+1):
-            self.set_pixel(x, y, distance, texture.get_f(tx, ty))
+            self.set_pixel(x, y, distance, texture.sample(tx, ty, self.TEXTURE_INTERPOLATE))
             ty += dty
 
     def draw_ceiling(self, x: int, y_end: int, z: float) -> None:
@@ -149,7 +152,7 @@ class Raycaster:
 
     def rotate_player_to(self, angle: float) -> None:
         self.player_direction = Vec2.from_angle(angle)
-        self.camera_plane = Vec2.from_angle(angle - math.pi / 2) * math.tan(self.FOV / 2)
+        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2)
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
