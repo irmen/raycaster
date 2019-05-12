@@ -36,13 +36,13 @@ class Minimap(tkinter.Canvas):
         scr_height = self.height * self.SCALE
         scr_location = location * self.SCALE
         self.coords(self.camera, scr_location.x-4, scr_height-scr_location.y+4, scr_location.x+4, scr_height-scr_location.y-4)
-        angle = location + direction * 3
+        angle = location + direction
         scr_angle = angle * self.SCALE
         self.coords(self.camera_angle, scr_location.x, scr_height-scr_location.y, scr_angle.x, scr_height-scr_angle.y)
         triangle = [
             location,
-            location + (direction + camera_plane)*3,
-            location + (direction - camera_plane)*3
+            location + (direction + camera_plane),
+            location + (direction - camera_plane)
         ]
         triangle = [v * self.SCALE for v in triangle]
         poly = []
@@ -72,7 +72,7 @@ class RaycasterWindow(tkinter.Tk):
         self.label.pack()
         self.minimap = Minimap(self, self.raycaster.map)
         self.minimap.pack(pady=5)
-        self.minimap.move_player(self.raycaster.player_coords, self.raycaster.player_direction, self.raycaster.camera_plane)
+        self.minimap.move_player(self.raycaster.player_position, self.raycaster.player_direction, self.raycaster.camera_plane)
         self.bind("w", lambda e: self.raycaster.move_player_forward_or_back(0.1))
         self.bind("s", lambda e: self.raycaster.move_player_forward_or_back(-0.1))
         self.bind("a", lambda e: self.raycaster.move_player_left_or_right(-0.1))
@@ -96,7 +96,7 @@ class RaycasterWindow(tkinter.Tk):
     def redraw(self):
         self.raycaster.tick(int(time.monotonic() * 1000) - self.time_msec_epoch)
         self.update_gui_image()
-        self.minimap.move_player(self.raycaster.player_coords, self.raycaster.player_direction, self.raycaster.camera_plane)
+        self.minimap.move_player(self.raycaster.player_position, self.raycaster.player_direction, self.raycaster.camera_plane)
         now = time.monotonic()
         fps = 1/(now - self.perf_timestamp)
         self.perf_timestamp = now

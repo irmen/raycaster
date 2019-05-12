@@ -1,6 +1,6 @@
 import pkgutil
 import io
-from math import pi, tan, radians, modf
+from math import pi, tan, radians, atan2, cos, modf
 from typing import Tuple, List, Optional
 from PIL import Image
 from .vector import Vec2
@@ -22,22 +22,19 @@ class Texture:
                 column = [img.getpixel((x, y)) for y in range(self.SIZE)]
                 self.pixels.append(column)
 
-    def sample(self, x: float, y: float, interpolate: bool) -> Tuple[int, int, int]:
+    def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
-        tx = x * self.SIZE
-        ty = y * self.SIZE
-        p1 = self.pixels[int(tx)][int(ty)]
-        if interpolate:
-            # TODO weighted interpolation instead of 0.5/0.5
-            p2 = self.pixels[int(tx+0.5)][int(ty+0.5)]
-            return (p1[0]+p2[0])//2, (p1[1]+p2[1])//2, (p1[2]+p2[2])//2
-        return p1
+        # TODO weighted interpolation sampling
+        sc = self.SIZE-1
+        # x = min(1.0, x)
+        # y = min(1.0, y)
+        return self.pixels[round(x * sc)][round(y * sc)]
 
 
 class Raycaster:
     FOV = radians(70)
+    FOCAL_LENGTH = 3.0
     BLACK_DISTANCE = 6.0
-    TEXTURE_INTERPOLATE = True
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -53,9 +50,9 @@ class Raycaster:
         }
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
-        self.player_coords = Vec2(0, 0)
-        self.player_direction = Vec2(0, 1)       # always normalized to length 1
-        self.camera_plane = Vec2(tan(self.FOV/2), 0)
+        self.player_position = Vec2(0, 0)
+        self.player_direction = Vec2(0, self.FOCAL_LENGTH)
+        self.camera_plane = Vec2(tan(self.FOV/2) * self.FOCAL_LENGTH, 0)
         self.map = self.load_map()      # rows, so map[y][x] to get a square
 
     def load_map(self) -> List[bytearray]:
@@ -79,7 +76,7 @@ class Raycaster:
         for y, line in enumerate(cmap):
             x = line.find('s')
             if x >= 0:
-                self.player_coords = Vec2(x+0.5, y+0.5)
+                self.player_position = Vec2(x + 0.5, y + 0.5)
                 break
         m2 = []
         for mapline in cmap:
@@ -92,67 +89,96 @@ class Raycaster:
         # raycast all pixel columns
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
-            if 0 < distance <= self.BLACK_DISTANCE:
-                wall_height = int(self.pixheight / distance)
-                if wall_height < self.pixheight:
+            if distance > 0:
+                distance = max(0.1, distance)
+                wall_height = self.pixheight / distance
+                if wall_height <= self.pixheight:
                     # column fits on the screen; no clipping
-                    y_top = (self.pixheight - wall_height) // 2
-                    y_bottom = (self.pixheight + wall_height) // 2 - 1
+                    y_top = int((self.pixheight - wall_height) / 2)
+                    num_y_pixels = int(wall_height)
                     texture_y = 0.0
                 else:
                     # column extends outside the screen; clip it
                     y_top = 0
-                    y_bottom = self.pixheight-1
+                    num_y_pixels = self.pixheight
                     texture_y = 0.5 - self.pixheight/wall_height/2
-                self.draw_ceiling(x, y_top-1, distance)
+                self.draw_ceiling(x, y_top)
                 if wall > 0:
-                    texture = self.textures["test"] # XXX self.wall_textures[wall]
+                    texture = self.textures["test"]  # self.wall_textures[wall]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
-                    self.draw_wall_column(x, y_top, y_bottom, wall_height, distance, texture, texture_x, texture_y)
-                self.draw_floor(x, y_bottom+1, distance)
+                    self.draw_wall_column(x, y_top, num_y_pixels, distance, texture, texture_x, texture_y, wall_height)
+                else:
+                    self.draw_black_column(x, y_top, num_y_pixels, distance)
+                self.draw_floor(x, y_top + num_y_pixels)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
-        # TODO cast ray: find wall, distance, walltexture x-coordinate
-        tx = (pixel_x/self.pixwidth * 4) % 1.0
-        distance = 0.2+self.BLACK_DISTANCE*abs(1.0-2.0*pixel_x/self.pixwidth) + self.frame/120
-        return 2, distance, tx
+        camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
+        cast_ray = (self.player_direction + camera_plane_ray).normalized()
+        # TODO correct fisheye effect: program this without using vectors and instead calc sin/cos steps?
+        step = 0.0
+        square = 0
+        tx = 0.0
+        while step <= self.BLACK_DISTANCE and square == 0:
+            step += 0.02
+            ray = self.player_position + cast_ray * step
+            square = self.get_map_square(ray.x, ray.y)
+        if square:
+            # TODO walltexture x-coordinate
+            tx = (pixel_x/self.pixwidth * 4) % 1.0
+        return square, step, tx
+        # TODO more efficient algorithm: use map square dx/dy steps to hop to the next map square instead of 'tracing the ray'
 
-    def draw_wall_column(self, x: int, y_top: int, y_bottom: int, column_height: int, distance: float,
-                         texture: Texture, tx: float, ty: float) -> None:
-        dty = 1.0/column_height
-        for y in range(y_top, y_bottom+1):
-            self.set_pixel(x, y, distance, texture.sample(tx, ty, self.TEXTURE_INTERPOLATE))
+    def get_map_square(self, x: float, y: float) -> int:
+        mx = int(x)
+        my = int(y)
+        if mx < 0 or mx >= len(self.map[0]) or my <0 or my >= len(self.map):
+            return 0
+        return self.map[my][mx]
+
+    def draw_wall_column(self, x: int, y_top: int, num_y_pixels: int, distance: float,
+                         texture: Texture, tx: float, ty: float, wall_height: float) -> None:
+        dty = 1/int(wall_height-1)
+        for y in range(y_top, y_top+num_y_pixels):
+            self.set_pixel(x, y, distance, texture.sample(tx, ty))
             ty += dty
 
-    def draw_ceiling(self, x: int, y_end: int, z: float) -> None:
-        # TODO draw ceiling texture
-        for y in range(y_end+1):
-            self.set_pixel(x, y, z, (20, 100, 255))
+    def draw_black_column(self, x: int, y_top: int, num_y_pixels: int, distance: float) -> None:
+        for y in range(y_top, y_top+num_y_pixels):
+            self.set_pixel(x, y, distance, (0, 0, 0))
 
-    def draw_floor(self, x: int, y_start: int, z: float) -> None:
-        # TODO draw floor texture
+    def draw_ceiling(self, x: int, num_y_pixels: int) -> None:
+        # TODO draw ceiling with texture
+        df = 1/((self.pixheight - self.pixheight/self.BLACK_DISTANCE)/2/self.BLACK_DISTANCE)
+        for y in range(num_y_pixels):
+            self.set_pixel(x, y, y * df, (20, 100, 255))
+
+    def draw_floor(self, x: int, y_start: int) -> None:
+        # TODO draw floor with texture
+        df = 1/((self.pixheight - self.pixheight/self.BLACK_DISTANCE)/2/self.BLACK_DISTANCE)
         for y in range(y_start, self.pixheight):
-            self.set_pixel(x, y, z, (0, 160, 20))
+            self.set_pixel(x, y, (self.pixheight-y)*df, (0, 255, 20))
 
     def move_player_forward_or_back(self, amount: float) -> None:
-        new = self.player_coords + amount * self.player_direction
+        # TODO enforce a certain minimum distance to a wall
+        new = self.player_position + amount * self.player_direction.normalized()
         if self.map[int(new.y)][int(new.x)] == 0:
-            self.player_coords = new
+            self.player_position = new
 
     def move_player_left_or_right(self, amount: float) -> None:
-        direction = Vec2(self.player_direction.y, -self.player_direction.x)
-        new = self.player_coords + amount * direction
+        # TODO enforce a certain minimum distance to a wall
+        dn = self.player_direction.normalized()
+        new = self.player_position + amount * Vec2(dn.y, -dn.x)
         if self.map[int(new.y)][int(new.x)] == 0:
-            self.player_coords = new
+            self.player_position = new
 
     def rotate_player(self, angle: float) -> None:
         new_angle = self.player_direction.angle() + angle
         self.rotate_player_to(new_angle)
 
     def rotate_player_to(self, angle: float) -> None:
-        self.player_direction = Vec2.from_angle(angle)
-        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2)
+        self.player_direction = Vec2.from_angle(angle) * self.FOCAL_LENGTH
+        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2) * self.FOCAL_LENGTH
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
