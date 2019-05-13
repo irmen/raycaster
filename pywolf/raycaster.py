@@ -66,11 +66,11 @@ class Raycaster:
         cmap = ["11111111111111111111",
                 "1..................1",
                 "1..111111222222....1",
-                "1.....2.....1......1",
-                "1.....2.....1......1",
-                "1...112.....1222...1",
-                "1.....2222..1......1",
-                "1...........1......1",
+                "1.....2.....2......1",
+                "1.....2.....2......1",
+                "1...112.....2222...1",
+                "1.....1222..2......1",
+                "1...........2......1",
                 "1........s.........1",
                 "11111111111111111111"]         # (0,0) is bottom left
         cmap.reverse()  # flip the Y axis so (0,0) is at bottom left
@@ -95,7 +95,7 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-        # TODO fix rounding issues that cause uneven wall edges
+        # TODO fix rounding issues that cause uneven wall edges and texture noise
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
