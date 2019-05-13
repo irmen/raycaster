@@ -32,11 +32,8 @@ class Texture:
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
-        # TODO weighted interpolation sampling
-        # x = min(1.0, x)
-        # y = min(1.0, y)
-        sc = self.SIZE-1
-        return self.image[round(x * sc), round(y * sc)]
+        # TODO weighted interpolation sampling?
+        return self.image[round(x * (self.SIZE-1)), round(y * (self.SIZE-1))]
 
 
 class Raycaster:
@@ -91,7 +88,7 @@ class Raycaster:
         return m2
 
     def tick(self, walltime_msec: float) -> None:
-        # self.clear_zbuffer()        # TODO actually use the z-buffer for something useful
+        # self.clear_zbuffer()        # TODO actually use the z-buffer for something
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
@@ -133,7 +130,7 @@ class Raycaster:
             ray = self.player_position + cast_ray * step
             square = self.get_map_square(ray.x, ray.y)
         if square:
-            # TODO walltexture x-coordinate
+            # TODO correct walltexture x-coordinate by calculating ray intersection with square
             tx = (pixel_x/self.pixwidth * 4) % 1.0
         # avoid fish-eye effect by taking the distance perpendicular to the camera direction
         distance = step * cos(cast_ray.angle() - self.player_direction.angle())
@@ -202,8 +199,8 @@ class Raycaster:
         If rgb is None, the pixel is transparent instead of having a color."""
         # TODO use the z-buffer (for now we ignore it because there's nothing using it at the moment)
         # if z <= self.zbuffer[x][y]:
-        #     self.zbuffer[x][y] = z
         #     if rgb:
+        #         self.zbuffer[x][y] = z
         #         if z > 0:
         #             rgb = self.rgb_brightness(rgb, bz = 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE)
         #         self.image.putpixel((x, y), rgb)

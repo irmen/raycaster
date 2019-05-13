@@ -18,15 +18,14 @@ Tip: try using Pypy3 to run this (instead of CPython). It will *greatly* improve
 
 ## Todo
 
-- draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have)
 - fix the wall texture X position by calculating the ray intersection point
+- draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have)
 - fix the rounding errors that result in uneven wall edges and texture jumps
 - use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
 - find a use for the Z-buffer :)
-- add sprites?
 - interpolated texture sampling?
 - simple directional global lighting so not all walls appear the same brightness?
-  (when imagining a cave and holding a torch however, this makes no sense...)
+- add some sprites (objects, monsters)?
 
 
 # World coordinate system
