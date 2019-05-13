@@ -2,7 +2,7 @@
 
 This is an attempt at a Python 3 implementation of a classic raycaster. Think original DOS Wolfenstein.
 
-Run this with any recent Python 3 version::
+Run this with any recent Python 3 version (tip: use Pypy for a huge performance boost):
 
     python -m pywolf
     
@@ -13,8 +13,6 @@ is to learn how to build a raycaster engine, and not to create an actual playabl
 The program uses just built-in Tkinter for the GUI and display, and Pillow to load the textures 
 and provide a pixel image display.
 
-Tip: try using Pypy3 to run this (instead of CPython). It will *greatly* improve
- the performance and can actually result in a very smooth frame rate.
 
 ## Todo
 
