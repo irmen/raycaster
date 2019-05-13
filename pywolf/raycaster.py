@@ -1,7 +1,7 @@
 import pkgutil
 import io
 from math import pi, tan, radians, cos
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, BinaryIO
 from PIL import Image
 from .vector import Vec2
 
@@ -15,32 +15,34 @@ from .vector import Vec2
 class Texture:
     SIZE = 64      # must be power of 2
 
-    def __init__(self, imagedata: Optional[bytes]) -> None:
-        if not imagedata:
-            raise ValueError("no image data loaded")
-        with Image.open(io.BytesIO(imagedata)) as img:
-            if img.size != (self.SIZE, self.SIZE):
-                raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
-            if img.mode != "RGB":
-                raise IOError(f"texture is not RGB (must not have alpha-channel)")
-            self.pixels = []        # type: List[List[Tuple[int, int, int]]]
-            for x in range(self.SIZE):
-                column = [img.getpixel((x, y)) for y in range(self.SIZE)]
-                self.pixels.append(column)
+    def __init__(self, image_data: BinaryIO) -> None:
+        img = Image.open(image_data)
+        if img.size != (self.SIZE, self.SIZE):
+            raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
+        if img.mode != "RGB":
+            raise IOError(f"texture is not RGB (must not have alpha-channel)")
+        self.image = img.load()
+
+    @classmethod
+    def from_resource(cls, name: str) -> "Texture":
+        data = pkgutil.get_data(__name__, name)
+        if not data:
+            raise IOError("can't find texture "+name)
+        return cls(io.BytesIO(data))
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
         # TODO weighted interpolation sampling
-        sc = self.SIZE-1
         # x = min(1.0, x)
         # y = min(1.0, y)
-        return self.pixels[round(x * sc)][round(y * sc)]
+        sc = self.SIZE-1
+        return self.image[round(x * sc), round(y * sc)]
 
 
 class Raycaster:
     FOV = radians(80)
     FOCAL_LENGTH = 3.0
-    BLACK_DISTANCE = 6.0
+    BLACK_DISTANCE = 5.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -48,11 +50,11 @@ class Raycaster:
         self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
         self.textures = {
-            "test": Texture(pkgutil.get_data(__name__, "textures/test.png")),
-            "floor": Texture(pkgutil.get_data(__name__, "textures/floor.png")),
-            "ceiling": Texture(pkgutil.get_data(__name__, "textures/ceiling.png")),
-            "wall-bricks": Texture(pkgutil.get_data(__name__, "textures/wall-bricks.png")),
-            "wall-stone": Texture(pkgutil.get_data(__name__, "textures/wall-stone.png")),
+            "test": Texture.from_resource("textures/test.png"),
+            "floor": Texture.from_resource("textures/floor.png"),
+            "ceiling": Texture.from_resource("textures/ceiling.png"),
+            "wall-bricks": Texture.from_resource("textures/wall-bricks.png"),
+            "wall-stone": Texture.from_resource("textures/wall-stone.png"),
         }
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
@@ -92,7 +94,8 @@ class Raycaster:
     def tick(self, walltime_msec: float) -> None:
         # self.clear_zbuffer()        # TODO actually use the z-buffer for something useful
         self.frame += 1
-        # raycast all pixel columns
+        # cast a ray per pixel column on the screen!
+        # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -119,14 +122,14 @@ class Raycaster:
                 self.draw_floor(x, y_top + num_y_pixels)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
-        # TODO more efficient algorithm: use map square dx/dy steps to hop to the next map square instead of 'tracing the ray'
+        # TODO more efficient algorithm: use map square dx/dy steps to hop map squares, instead of 'tracing the ray'
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
         cast_ray = (self.player_direction + camera_plane_ray).normalized()
         step = 0.0
         square = 0
         tx = 0.0
         while step <= self.BLACK_DISTANCE and square == 0:
-            step += 0.02
+            step += 0.02        # lower this to increase ray resolution
             ray = self.player_position + cast_ray * step
             square = self.get_map_square(ray.x, ray.y)
         if square:
@@ -210,6 +213,11 @@ class Raycaster:
             self.image.putpixel((x, y), rgb)
 
     def rgb_brightness(self, rgb: Tuple[int, int, int], scale: float) -> Tuple[int, int, int]:
-        """adjust brightness of the color. scale 0=black, 1=neutral, >1 = whiter. (clamped at 0..255)"""
-        r, g, b = rgb
-        return min(int(r*scale), 255), min(int(g*scale), 255), min(int(b*scale), 255)
+        """adjust brightness of the color. scale 0=black, 1=neutral, >1 = whiter. (clamped to 0..255)"""
+        # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
+        # it's almost as good and a lot faster to just scale the r,g,b values themselves.
+        # from colorsys import rgb_to_hls, hls_to_rgb
+        # h, l, s = rgb_to_hls(*rgb)
+        # r, g, b = hls_to_rgb(h, l*scale, s)
+        r, g, b = rgb[0]*scale, rgb[1]*scale, rgb[2]*scale
+        return min(int(r), 255), min(int(g), 255), min(int(b), 255)
