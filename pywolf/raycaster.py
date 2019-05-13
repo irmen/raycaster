@@ -1,10 +1,16 @@
 import pkgutil
 import io
-from math import pi, tan, radians, atan2, cos, modf
+from math import pi, tan, radians, cos
 from typing import Tuple, List, Optional
 from PIL import Image
 from .vector import Vec2
 
+
+# optimization ideas:
+#
+# - get rid of the Vector class and inline trig functions
+#   (does result in code that is less easier to understand, imo)
+#
 
 class Texture:
     SIZE = 64      # must be power of 2
@@ -32,7 +38,7 @@ class Texture:
 
 
 class Raycaster:
-    FOV = radians(70)
+    FOV = radians(80)
     FOCAL_LENGTH = 3.0
     BLACK_DISTANCE = 6.0
 
@@ -113,9 +119,9 @@ class Raycaster:
                 self.draw_floor(x, y_top + num_y_pixels)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
+        # TODO more efficient algorithm: use map square dx/dy steps to hop to the next map square instead of 'tracing the ray'
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
         cast_ray = (self.player_direction + camera_plane_ray).normalized()
-        # TODO correct fisheye effect: program this without using vectors and instead calc sin/cos steps?
         step = 0.0
         square = 0
         tx = 0.0
@@ -126,8 +132,9 @@ class Raycaster:
         if square:
             # TODO walltexture x-coordinate
             tx = (pixel_x/self.pixwidth * 4) % 1.0
-        return square, step, tx
-        # TODO more efficient algorithm: use map square dx/dy steps to hop to the next map square instead of 'tracing the ray'
+        # avoid fish-eye effect by taking the distance perpendicular to the camera direction
+        distance = step * cos(cast_ray.angle() - self.player_direction.angle())
+        return square, distance, tx
 
     def get_map_square(self, x: float, y: float) -> int:
         mx = int(x)
