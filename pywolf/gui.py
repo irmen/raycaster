@@ -36,13 +36,13 @@ class Minimap(tkinter.Canvas):
         scr_height = self.height * self.SCALE
         scr_location = location * self.SCALE
         self.coords(self.camera, scr_location.x-4, scr_height-scr_location.y+4, scr_location.x+4, scr_height-scr_location.y-4)
-        angle = location + direction
+        angle = location + direction * 3
         scr_angle = angle * self.SCALE
         self.coords(self.camera_angle, scr_location.x, scr_height-scr_location.y, scr_angle.x, scr_height-scr_angle.y)
         triangle = [
             location,
-            location + (direction + camera_plane),
-            location + (direction - camera_plane)
+            location + (direction + camera_plane) * 3,
+            location + (direction - camera_plane) * 3
         ]
         triangle = [v * self.SCALE for v in triangle]
         poly = []
@@ -70,9 +70,25 @@ class RaycasterWindow(tkinter.Tk):
         self.label = tkinter.Label(self, text="pixels", border=0)
         self.update_gui_image()
         self.label.pack()
-        self.minimap = Minimap(self, self.raycaster.map)
-        self.minimap.pack(pady=5)
+        bottomframe = tkinter.Frame(self)
+        self.minimap = Minimap(bottomframe, self.raycaster.map)
+        self.minimap.pack(side=tkinter.LEFT)
         self.minimap.move_player(self.raycaster.player_position, self.raycaster.player_direction, self.raycaster.camera_plane)
+        controlsframe = tkinter.Frame(bottomframe)
+        self.var_fov = tkinter.DoubleVar(value=math.degrees(self.raycaster.FOV))
+        self.var_bd = tkinter.DoubleVar(value=self.raycaster.BLACK_DISTANCE)
+        fov_label = tkinter.Label(controlsframe, text="Field Of View")
+        fov_entry = tkinter.Entry(controlsframe, textvariable=self.var_fov, justify=tkinter.RIGHT)
+        bd_label = tkinter.Label(controlsframe, text="Black distance")
+        bd_entry = tkinter.Entry(controlsframe, textvariable=self.var_bd, justify=tkinter.RIGHT)
+        fov_entry.bind("<Return>", self.change_fov)
+        bd_entry.bind("<Return>", self.change_black_distance)
+        fov_label.pack()
+        fov_entry.pack()
+        bd_label.pack()
+        bd_entry.pack()
+        controlsframe.pack()
+        bottomframe.pack()
         self.bind("w", lambda e: self.raycaster.move_player_forward_or_back(0.1))
         self.bind("s", lambda e: self.raycaster.move_player_forward_or_back(-0.1))
         self.bind("a", lambda e: self.raycaster.move_player_left_or_right(-0.1))
@@ -81,6 +97,14 @@ class RaycasterWindow(tkinter.Tk):
         self.bind("e", lambda e: self.raycaster.rotate_player(-math.pi/50))
         self.bind("<Motion>", self.mouse_move)
         self.after(20, self.redraw)
+
+    def change_fov(self, e):
+        self.raycaster.FOV = math.radians(self.var_fov.get())
+        self.focus_set()
+
+    def change_black_distance(self, e):
+        self.raycaster.BLACK_DISTANCE = self.var_bd.get()
+        self.focus_set()
 
     def mouse_move(self, e):
         mousex = self.winfo_pointerx() - self.winfo_rootx()

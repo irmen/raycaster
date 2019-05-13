@@ -41,7 +41,6 @@ class Texture:
 
 class Raycaster:
     FOV = radians(80)
-    FOCAL_LENGTH = 3.0
     BLACK_DISTANCE = 5.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
@@ -59,8 +58,8 @@ class Raycaster:
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
         self.player_position = Vec2(0, 0)
-        self.player_direction = Vec2(0, self.FOCAL_LENGTH)
-        self.camera_plane = Vec2(tan(self.FOV/2) * self.FOCAL_LENGTH, 0)
+        self.player_direction = Vec2(0, 1)
+        self.camera_plane = Vec2(tan(self.FOV/2), 0)
         self.map = self.load_map()      # rows, so map[y][x] to get a square
 
     def load_map(self) -> List[bytearray]:
@@ -96,6 +95,7 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
+        # TODO fix rounding issues that cause uneven wall edges
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -187,8 +187,8 @@ class Raycaster:
         self.rotate_player_to(new_angle)
 
     def rotate_player_to(self, angle: float) -> None:
-        self.player_direction = Vec2.from_angle(angle) * self.FOCAL_LENGTH
-        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2) * self.FOCAL_LENGTH
+        self.player_direction = Vec2.from_angle(angle)
+        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2)
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")

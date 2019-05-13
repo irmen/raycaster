@@ -26,9 +26,9 @@ is only able to draw corridors that all have the same floor level and height.
 # camera coordinates and viewing angle
 
 The camera is just a 2d vector, it's viewing direction another 2d vector.
-(the length of the viewing direction vector is the camera's focal length)
+(the length of the viewing direction vector doesn't matter, so we just normalize it).
 The 'height' of the camera is simulated in the column rasterizer phase where it
 determines the height and position of the walls. Currently, the height of the
 camera is exactly in the middle between ceiling and floor.
 It is not possible to look up or down: you can only rotate the camera horizontally.
-Focal length and FOV can be adjusted to tweak the perspective.
+FOV can be adjusted to tweak the (horizontal) perspective.
