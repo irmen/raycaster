@@ -81,14 +81,17 @@ class RaycasterWindow(tkinter.Tk):
         fov_entry = tkinter.Entry(controlsframe, textvariable=self.var_fov, justify=tkinter.RIGHT)
         bd_label = tkinter.Label(controlsframe, text="Black distance")
         bd_entry = tkinter.Entry(controlsframe, textvariable=self.var_bd, justify=tkinter.RIGHT)
+        controls_label = tkinter.Label(controlsframe, text="\n\nControls:\nw,s,a,d - movement\nq,e - rotation\nmouse - rotation\nleft button - move (fine)")
         fov_entry.bind("<Return>", self.change_fov)
         bd_entry.bind("<Return>", self.change_black_distance)
         fov_label.pack()
         fov_entry.pack()
         bd_label.pack()
         bd_entry.pack()
+        controls_label.pack()
         controlsframe.pack()
         bottomframe.pack()
+        self.mouse_button_down = False
         self.bind("w", lambda e: self.raycaster.move_player_forward_or_back(0.1))
         self.bind("s", lambda e: self.raycaster.move_player_forward_or_back(-0.1))
         self.bind("a", lambda e: self.raycaster.move_player_left_or_right(-0.1))
@@ -96,6 +99,8 @@ class RaycasterWindow(tkinter.Tk):
         self.bind("q", lambda e: self.raycaster.rotate_player(math.pi/50))
         self.bind("e", lambda e: self.raycaster.rotate_player(-math.pi/50))
         self.bind("<Motion>", self.mouse_move)
+        self.bind("<Button-1>", lambda e: self.mouse_button_change(True))
+        self.bind("<ButtonRelease-1>", lambda e: self.mouse_button_change(False))
         self.after(20, self.redraw)
 
     def change_fov(self, e):
@@ -111,6 +116,9 @@ class RaycasterWindow(tkinter.Tk):
         mousex -= self.winfo_width()//2
         self.raycaster.rotate_player_to(math.pi / 2.0 + 2.0 * math.pi * -mousex / 800.0)
 
+    def mouse_button_change(self, down: bool) -> None:
+        self.mouse_button_down = down
+
     def update_gui_image(self):
         self.imageTk = ImageTk.PhotoImage(self.raycaster.image.resize(
             (self.PIXEL_WIDTH*self.PIXEL_SCALE, self.PIXEL_HEIGHT*self.PIXEL_SCALE), Image.NEAREST))
@@ -125,6 +133,8 @@ class RaycasterWindow(tkinter.Tk):
         fps = 1/(now - self.perf_timestamp)
         self.perf_timestamp = now
         self.wm_title(f"pure Python raycaster  -  {fps:.0f} fps")
+        if self.mouse_button_down:
+            self.raycaster.move_player_forward_or_back(1/fps)
         if fps < 30:
             self.after_idle(self.redraw)
         else:

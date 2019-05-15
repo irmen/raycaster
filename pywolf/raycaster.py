@@ -37,7 +37,7 @@ class Texture:
 
 
 class Raycaster:
-    FOV = radians(80)
+    FOV = radians(75)
     BLACK_DISTANCE = 5.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
@@ -62,13 +62,13 @@ class Raycaster:
     def load_map(self) -> List[bytearray]:
         cmap = ["11111111111111111111",
                 "1..................1",
-                "1..111111222222....1",
-                "1.....2.....2......1",
-                "1.....2.....2......1",
-                "1...112.....2222...1",
+                "1..111111222222.2221",
+                "1.....1.....2......1",
+                "1.....1.....2......1",
+                "1...111.....2222...1",
                 "1.....1222..2......1",
-                "1...........2......1",
-                "1........s.........1",
+                "1......222..2.1.2.11",
+                "1.........s........1",
                 "11111111111111111111"]         # (0,0) is bottom left
         cmap.reverse()  # flip the Y axis so (0,0) is at bottom left
 
@@ -93,6 +93,8 @@ class Raycaster:
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         # TODO fix rounding issues that seem to cause uneven wall texture sampling, tried some int truncation and rounding, but to no avail yet
+        #      it may be caused by the effort taken to always draw the bottom pixel line of the wall textures?
+        #      or perhaps because we determine the y coordinate in integer pixels too early?
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -110,7 +112,7 @@ class Raycaster:
                     texture_y = 0.5 - self.pixheight/wall_height/2
                 self.draw_ceiling(x, y_top)
                 if wall > 0:
-                    texture = self.wall_textures[wall]
+                    texture = self.wall_textures[wall]  # XXX self.textures["test"]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
                     self.draw_wall_column(x, y_top, num_y_pixels, distance, texture, texture_x, texture_y, wall_height)
@@ -189,7 +191,7 @@ class Raycaster:
 
     def draw_wall_column(self, x: int, y_top: int, num_y_pixels: int, distance: float,
                          texture: Texture, tx: float, ty: float, wall_height: float) -> None:
-        dty = 1/int(wall_height-1)
+        dty = 1/(wall_height-1)     # -1 to also show to textures bottom pixel row...
         for y in range(y_top, y_top+num_y_pixels):
             self.set_pixel(x, y, distance, texture.sample(tx, ty))
             ty += dty
@@ -246,19 +248,19 @@ class Raycaster:
         #     if rgb:
         #         self.zbuffer[x][y] = z
         #         if z > 0:
-        #             rgb = self.rgb_brightness(rgb, bz = 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE)
+        #             rgb = self.rgb_brightness(rgb, 1.0 - z / self.BLACK_DISTANCE)
         #         self.image.putpixel((x, y), rgb)
         if rgb:
             if z > 0:
-                rgb = self.rgb_brightness(rgb, 1.0-min(self.BLACK_DISTANCE, z)/self.BLACK_DISTANCE)
+                rgb = self.rgb_brightness(rgb, 1.0 - z / self.BLACK_DISTANCE)
             self.image.putpixel((x, y), rgb)
 
-    def rgb_brightness(self, rgb: Tuple[int, int, int], scale: float) -> Tuple[int, int, int]:
-        """adjust brightness of the color. scale 0=black, 1=neutral, >1 = whiter. (clamped to 0..255)"""
+    def rgb_brightness(self, rgb: Tuple[int, int, int], brightness: float) -> Tuple[int, int, int]:
+        """adjust brightness of the color. brightness 0=pitch black, 1=normal"""
         # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
         # it's almost as good and a lot faster to just scale the r,g,b values themselves.
         # from colorsys import rgb_to_hls, hls_to_rgb
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
-        r, g, b = rgb[0]*scale, rgb[1]*scale, rgb[2]*scale
-        return min(int(r), 255), min(int(g), 255), min(int(b), 255)
+        brightness = max(0.0, min(1.0, brightness))
+        return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
