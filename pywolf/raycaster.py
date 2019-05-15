@@ -92,7 +92,7 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-        # TODO fix rounding issues that cause uneven wall edges and texture noise
+        # TODO fix rounding issues that cause uneven wall edges and texture noise, tried some int truncation and rounding, but to no avail yet
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
