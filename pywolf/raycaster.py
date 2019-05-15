@@ -136,6 +136,54 @@ class Raycaster:
         distance = step * cos(cast_ray.angle() - self.player_direction.angle())
         return square, distance, tx
 
+    def calc_intersection_with_mapsquare(self, camera: Vec2, viewray: Vec2) -> Tuple[float, Vec2]:
+        """Returns (texturecoordinate, Vec2(intersect x, intersect y))"""
+        ray_end = camera + viewray
+        square_center = Vec2(int(ray_end.x) + 0.5, int(ray_end.y) + 0.5)
+        if camera.x < square_center.x:
+            # left half of square
+            if camera.y < square_center.y:
+                vertex_angle = ((square_center + Vec2(-0.5, -0.5)) - camera).angle()
+                intersects = "bottom" if viewray.angle() < vertex_angle else "left"
+            else:
+                vertex_angle = ((square_center + Vec2(-0.5, 0.5)) - camera).angle()
+                intersects = "left" if viewray.angle() < vertex_angle else "top"
+        else:
+            # right half of square
+            # TODO optimize this a bit more
+            if camera.y < square_center.y:
+                # mirror camera x around square center (and flip the viewray too) to avoid angle sign flip
+                flipped_cam = Vec2(square_center.x - camera.x + square_center.x, camera.y)
+                flipped_viewray = Vec2(-viewray.x, viewray.y)
+                vertex_angle = ((square_center + Vec2(-0.5, -0.5)) - flipped_cam).angle()
+                intersects = "bottom" if flipped_viewray.angle() < vertex_angle else "right"
+            else:
+                # mirror camera x around square center (and flip the viewray too) to avoid angle sign flip
+                flipped_cam = Vec2(square_center.x - camera.x + square_center.x, camera.y)
+                flipped_viewray = Vec2(-viewray.x, viewray.y)
+                vertex_angle = ((square_center + Vec2(-0.5, 0.5)) - flipped_cam).angle()
+                intersects = "right" if flipped_viewray.angle() < vertex_angle else "top"
+        if intersects == "top":
+            # determine x coordinate of intersection of the line from the camera, with the line y=square_center.y+0.5
+            iy = square_center.y + 0.5
+            ix = 0.0 if viewray.y == 0 else camera.x + (iy - camera.y) * viewray.x / viewray.y
+            return square_center.x + 0.5 - ix, Vec2(ix, iy)
+        elif intersects == "bottom":
+            # determine x coordinate of intersection of the line from the camera, with the line y=square_center.y-0.5
+            iy = square_center.y - 0.5
+            ix = 0.0 if viewray.y == 0 else camera.x + (iy - camera.y) * viewray.x / viewray.y
+            return ix - square_center.x + 0.5, Vec2(ix, iy)
+        elif intersects == "left":
+            # determine y coordinate of intersection of the line from the camera, with the line x=square_center.x-0.5
+            ix = square_center.x - 0.5
+            iy = 0.0 if viewray.x == 0 else camera.y + (ix - camera.x) * viewray.y / viewray.x
+            return square_center.y + 0.5 - iy, Vec2(ix, iy)
+        else:   # right
+            # determine y coordinate of intersection of the line from the camera, with the line x=square_center.x+0.5
+            ix = square_center.x + 0.5
+            iy = 0.0 if viewray.x == 0 else camera.y + (ix - camera.x) * viewray.y / viewray.x
+            return iy - square_center.y + 0.5, Vec2(ix, iy)
+
     def get_map_square(self, x: float, y: float) -> int:
         mx = int(x)
         my = int(y)
