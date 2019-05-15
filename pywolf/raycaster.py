@@ -92,15 +92,15 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-        # TODO fix rounding issues that cause uneven wall edges and texture noise, tried some int truncation and rounding, but to no avail yet
+        # TODO fix rounding issues that seem to cause uneven wall texture sampling, tried some int truncation and rounding, but to no avail yet
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
                 distance = max(0.1, distance)
-                wall_height = self.pixheight / distance
+                wall_height = round(self.pixheight / distance)
                 if wall_height <= self.pixheight:
                     # column fits on the screen; no clipping
-                    y_top = int((self.pixheight - wall_height) / 2)
+                    y_top = int(self.pixheight - wall_height) // 2
                     num_y_pixels = int(wall_height)
                     texture_y = 0.0
                 else:
@@ -110,7 +110,7 @@ class Raycaster:
                     texture_y = 0.5 - self.pixheight/wall_height/2
                 self.draw_ceiling(x, y_top)
                 if wall > 0:
-                    texture = self.textures["test"]  # self.wall_textures[wall]
+                    texture = self.wall_textures[wall]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
                     self.draw_wall_column(x, y_top, num_y_pixels, distance, texture, texture_x, texture_y, wall_height)
@@ -121,19 +121,19 @@ class Raycaster:
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO more efficient algorithm: use map square dx/dy steps to hop map squares, instead of 'tracing the ray'
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
-        cast_ray = (self.player_direction + camera_plane_ray).normalized()
-        step = 0.0
-        square = 0
-        tx = 0.0
-        while step <= self.BLACK_DISTANCE and square == 0:
-            step += 0.02        # lower this to increase ray resolution
-            ray = self.player_position + cast_ray * step
+        cast_ray = self.player_direction + camera_plane_ray
+        distance = 0.0
+        step_size = 0.02   # lower this to increase ray resolution
+        ray = self.player_position
+        ray_step = cast_ray * step_size
+        while distance <= self.BLACK_DISTANCE:
+            distance += step_size
+            ray += ray_step
             square = self.get_map_square(ray.x, ray.y)
-        if square:
-            tx, intersection = self.calc_intersection_with_mapsquare(self.player_position, ray)
-        # avoid fish-eye effect by taking the distance perpendicular to the camera direction
-        distance = step * cos(cast_ray.angle() - self.player_direction.angle())
-        return square, distance, tx
+            if square:
+                tx, intersection = self.calc_intersection_with_mapsquare(self.player_position, ray)
+                return square, distance, tx
+        return -1, distance, 0.0
 
     def calc_intersection_with_mapsquare(self, camera: Vec2, cast_ray: Vec2) -> Tuple[float, Vec2]:
         """Returns (wall texture coordinate, Vec2(intersect x, intersect y))"""
