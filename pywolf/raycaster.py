@@ -93,6 +93,7 @@ class Raycaster:
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         # TODO fix rounding issues that cause uneven wall edges and texture noise
+        # TODO rightmost texture column is never drawn?
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -130,14 +131,15 @@ class Raycaster:
             ray = self.player_position + cast_ray * step
             square = self.get_map_square(ray.x, ray.y)
         if square:
-            # TODO correct walltexture x-coordinate by calculating ray intersection with square
             tx = (pixel_x/self.pixwidth * 4) % 1.0
+            # TODO actual texture pixel: tx, intersection = self.calc_intersection_with_mapsquare(self.player_position, ray)
         # avoid fish-eye effect by taking the distance perpendicular to the camera direction
         distance = step * cos(cast_ray.angle() - self.player_direction.angle())
         return square, distance, tx
 
     def calc_intersection_with_mapsquare(self, camera: Vec2, viewray: Vec2) -> Tuple[float, Vec2]:
-        """Returns (texturecoordinate, Vec2(intersect x, intersect y))"""
+        """Returns (wall texture coordinate, Vec2(intersect x, intersect y))"""
+        # TODO fix this: assumes viewray is only the direction vector (but it will be the actual cast ray, camera+direction)
         ray_end = camera + viewray
         square_center = Vec2(int(ray_end.x) + 0.5, int(ray_end.y) + 0.5)
         if camera.x < square_center.x:
