@@ -16,10 +16,10 @@ and provide a pixel image display.
 
 ## Todo
 
-- fix the wall texture X position by calculating the ray intersection point
 - draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have)
 - fix the rounding errors that result in uneven wall edges and texture jumps
 - use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
+- use a more efficient way to calculate the ray intersection with a map square
 - find a use for the Z-buffer :)
 - interpolated texture sampling?
 - simple directional global lighting so not all walls appear the same brightness?
