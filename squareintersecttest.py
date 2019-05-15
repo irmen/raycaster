@@ -27,9 +27,9 @@ class Window(tkinter.Tk):
         self.canvas.bind("<Button-1>", lambda e: self.clicked(e.x, e.y))
         self.canvas.bind("<Motion>", lambda e: self.mousemove(e.x, e.y))
         self.camera = Vec2(0.7, 0.4)
-        self.viewray = Vec2(2, 0.9)
+        self.direction = Vec2(1, 0.3).normalized()
         self.cam_circle = self.canvas.create_oval(100, 100, 115, 115, fill='blue')
-        self.viewray_line = self.canvas.create_line(10,10, 100, 100, fill='purple', width=2)
+        self.castray_line = self.canvas.create_line(10, 10, 100, 100, fill='purple', width=2)
         self.intersect_point = self.canvas.create_oval(0, 0, 5, 5, fill='green')
         self.texcoord_lbl = tkinter.Label(self, text="?")
         self.texcoord_lbl.pack()
@@ -46,12 +46,12 @@ class Window(tkinter.Tk):
     def clicked(self, sx, sy):
         self.camera.x, self.camera.y = self.from_screen(sx, sy)
         self.move_camera()
-        self.viewray = Vec2(0, 0)
+        self.direction = Vec2(0, 0)
         self.trace_ray()
 
     def mousemove(self, sx, sy):
-        self.viewray.x, self.viewray.y = self.from_screen(sx, sy)
-        self.viewray -= self.camera
+        self.direction.x, self.direction.y = self.from_screen(sx, sy)
+        self.direction -= self.camera
         self.trace_ray()
 
     def move_camera(self):
@@ -60,10 +60,10 @@ class Window(tkinter.Tk):
 
     def trace_ray(self) -> None:
         rx1, ry1 = self.to_screen(self.camera.x, self.camera.y)
-        viewray_end = self.camera + self.viewray
-        rx2, ry2 = self.to_screen(viewray_end.x, viewray_end.y)
-        self.canvas.coords(self.viewray_line, rx1, ry1, rx2, ry2)
-        if square_origin.x <= viewray_end.x <= square_origin.x+1 and square_origin.y <= viewray_end.y <= square_origin.y+1:
+        cast_ray = self.camera + self.direction
+        rx2, ry2 = self.to_screen(cast_ray.x, cast_ray.y)
+        self.canvas.coords(self.castray_line, rx1, ry1, rx2, ry2)
+        if square_origin.x <= cast_ray.x <= square_origin.x+1 and square_origin.y <= cast_ray.y <= square_origin.y+1:
             self.intersect()
         else:
             self.no_intersect()
@@ -75,7 +75,8 @@ class Window(tkinter.Tk):
 
     def intersect(self) -> None:
         self.canvas.itemconfigure(self.square, fill='teal')
-        texture_coordinate, intersection = self.raycaster.calc_intersection_with_mapsquare(self.camera, self.viewray)
+        cast_ray = self.camera + self.direction
+        texture_coordinate, intersection = self.raycaster.calc_intersection_with_mapsquare(self.camera, cast_ray)
         sx, sy = self.to_screen(intersection.x, intersection.y)
         self.canvas.coords(self.intersect_point, sx-5, sy-5, sx+5, sy+5)
         self.texcoord_lbl.configure(text=f"texture coordinate: {texture_coordinate:.2f}")
