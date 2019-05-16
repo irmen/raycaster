@@ -1,6 +1,6 @@
 import pkgutil
 import io
-from math import pi, tan, radians, cos
+from math import pi, tan, radians
 from typing import Tuple, List, Optional, BinaryIO
 from PIL import Image
 from .vector import Vec2
@@ -32,13 +32,13 @@ class Texture:
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
-        # TODO weighted interpolation sampling?
-        return self.image[round(x * (self.SIZE-1)), round(y * (self.SIZE-1))]
+        s=self.SIZE-1
+        return self.image[int(x*s), int(y*s)]
 
 
 class Raycaster:
     FOV = radians(75)
-    BLACK_DISTANCE = 5.0
+    BLACK_DISTANCE = 4.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -94,7 +94,8 @@ class Raycaster:
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         # TODO fix rounding issues that seem to cause uneven wall texture sampling, tried some int truncation and rounding, but to no avail yet
         #      it may be caused by the effort taken to always draw the bottom pixel line of the wall textures?
-        #      or perhaps because we determine the y coordinate in integer pixels too early?
+        #      or most likely because the start y coordinate of the wall texture is always 0 ! (it should be centered)
+        #      (the resolution of the wall textures makes no difference)
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -103,7 +104,7 @@ class Raycaster:
                 if wall_height <= self.pixheight:
                     # column fits on the screen; no clipping
                     y_top = int(self.pixheight - wall_height) // 2
-                    num_y_pixels = int(wall_height)
+                    num_y_pixels = wall_height
                     texture_y = 0.0
                 else:
                     # column extends outside the screen; clip it
@@ -112,7 +113,7 @@ class Raycaster:
                     texture_y = 0.5 - self.pixheight/wall_height/2
                 self.draw_ceiling(x, y_top)
                 if wall > 0:
-                    texture = self.wall_textures[wall]  # XXX self.textures["test"]
+                    texture = self.textures["test"] # self.wall_textures[wall]  # XXX self.textures["test"]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
                     self.draw_wall_column(x, y_top, num_y_pixels, distance, texture, texture_x, texture_y, wall_height)
@@ -185,7 +186,7 @@ class Raycaster:
     def get_map_square(self, x: float, y: float) -> int:
         mx = int(x)
         my = int(y)
-        if mx < 0 or mx >= len(self.map[0]) or my <0 or my >= len(self.map):
+        if mx < 0 or mx >= len(self.map[0]) or my < 0 or my >= len(self.map):
             return 0
         return self.map[my][mx]
 
