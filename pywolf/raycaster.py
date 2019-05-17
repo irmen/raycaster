@@ -33,8 +33,6 @@ class Texture:
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
         s = self.SIZE-1
-        x = min(1.0, x)
-        y = min(1.0, y)
         return self.image[int(x*s), int(y*s)]
 
 

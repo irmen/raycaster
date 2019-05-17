@@ -16,14 +16,12 @@ and provide a pixel image display.
 
 ## Todo
 
-- draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have)
-- fix the rounding errors that result in uneven wall edges and texture jumps
-- use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
+- draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have!)
 - use a more efficient way to calculate the ray intersection with a map square
-- find a use for the Z-buffer :)
+- use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
 - interpolated texture sampling?
 - simple directional global lighting so not all walls appear the same brightness?
-- add some sprites (objects, monsters)?
+- add some sprites (objects, monsters)?  this will require the Z-buffer as well.
 
 
 # World coordinate system
