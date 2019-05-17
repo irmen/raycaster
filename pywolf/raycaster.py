@@ -32,13 +32,15 @@ class Texture:
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
-        s=self.SIZE-1
+        s = self.SIZE-1
+        x = min(1.0, x)
+        y = min(1.0, y)
         return self.image[int(x*s), int(y*s)]
 
 
 class Raycaster:
     FOV = radians(75)
-    BLACK_DISTANCE = 4.0
+    BLACK_DISTANCE = 5.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -92,34 +94,22 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-        # TODO fix rounding issues that seem to cause uneven wall texture sampling, tried some int truncation and rounding, but to no avail yet
-        #      it may be caused by the effort taken to always draw the bottom pixel line of the wall textures?
-        #      or most likely because the start y coordinate of the wall texture is always 0 ! (it should be centered)
-        #      (the resolution of the wall textures makes no difference)
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
                 distance = max(0.1, distance)
-                wall_height = round(self.pixheight / distance)
-                if wall_height <= self.pixheight:
-                    # column fits on the screen; no clipping
-                    y_top = int(self.pixheight - wall_height) // 2
-                    num_y_pixels = wall_height
-                    texture_y = 0.0
-                else:
-                    # column extends outside the screen; clip it
-                    y_top = 0
-                    num_y_pixels = self.pixheight
-                    texture_y = 0.5 - self.pixheight/wall_height/2
-                self.draw_ceiling(x, y_top)
+                ceiling_size = int((self.pixheight - self.pixheight/distance)/2)
+                if ceiling_size > 0:
+                    self.draw_ceiling(x, ceiling_size)
                 if wall > 0:
-                    texture = self.textures["test"] # self.wall_textures[wall]  # XXX self.textures["test"]
+                    texture = self.wall_textures[wall]  # XXX self.textures["test"]
                     if not texture:
                         raise KeyError("map specifies unknown wall texture " + str(wall))
-                    self.draw_wall_column(x, y_top, num_y_pixels, distance, texture, texture_x, texture_y, wall_height)
+                    self.draw_wall_column(x, ceiling_size, distance, texture, texture_x)
                 else:
-                    self.draw_black_column(x, y_top, num_y_pixels, distance)
-                self.draw_floor(x, y_top + num_y_pixels)
+                    self.draw_black_column(x, ceiling_size, distance)
+                if ceiling_size > 0:
+                    self.draw_floor(x, self.pixheight - ceiling_size)  # floor is same height as ceiling
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO more efficient algorithm: use map square dx/dy steps to hop map squares, instead of 'tracing the ray'
@@ -190,15 +180,17 @@ class Raycaster:
             return 0
         return self.map[my][mx]
 
-    def draw_wall_column(self, x: int, y_top: int, num_y_pixels: int, distance: float,
-                         texture: Texture, tx: float, ty: float, wall_height: float) -> None:
-        dty = 1/(wall_height-1)     # -1 to also show to textures bottom pixel row...
-        for y in range(y_top, y_top+num_y_pixels):
-            self.set_pixel(x, y, distance, texture.sample(tx, ty))
-            ty += dty
+    def draw_wall_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
+        start_y = max(0, ceiling)
+        num_pixels = self.pixheight - 2*start_y
+        wall_height = self.pixheight - 2*ceiling - 1
+        for y in range(start_y, start_y+num_pixels):
+            self.set_pixel(x, y, distance, texture.sample(tx, (y-ceiling) / wall_height))
 
-    def draw_black_column(self, x: int, y_top: int, num_y_pixels: int, distance: float) -> None:
-        for y in range(y_top, y_top+num_y_pixels):
+    def draw_black_column(self, x: int, ceiling: int, distance: float) -> None:
+        start_y = max(0, ceiling)
+        num_pixels = self.pixheight - 2*start_y
+        for y in range(start_y, start_y+num_pixels):
             self.set_pixel(x, y, distance, (0, 0, 0))
 
     def draw_ceiling(self, x: int, num_y_pixels: int) -> None:
