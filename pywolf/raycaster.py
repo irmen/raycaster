@@ -36,8 +36,8 @@ class Texture:
 
 
 class Raycaster:
-    FOV = radians(75)
-    BLACK_DISTANCE = 5.0
+    HVOF = radians(80)
+    BLACK_DISTANCE = 4.0
 
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
@@ -56,7 +56,7 @@ class Raycaster:
         self.frame = 0
         self.player_position = Vec2(0, 0)
         self.player_direction = Vec2(0, 1)
-        self.camera_plane = Vec2(tan(self.FOV/2), 0)
+        self.camera_plane = Vec2(tan(self.HVOF / 2), 0)
         self.map = self.load_map()      # rows, so map[y][x] to get a square
 
     def load_map(self) -> List[bytearray]:
@@ -92,36 +92,21 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
+        d_screen = 0.5/(tan(self.HVOF/2) * self.pixheight/self.pixwidth)
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
-                ceiling_size = int((self.pixheight - self.pixheight/distance)/2)
+                ceiling_size = int(self.pixheight * (1.0 - d_screen / distance) / 2.0)
                 self.wall_heights[x] = ceiling_size
                 if wall > 0:
-                    self.draw_wall_column(x, ceiling_size, distance, self.wall_textures[wall] or self.textures["test"], texture_x)
+                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall] or self.textures["test"], texture_x)
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
-        self.draw_floor_and_ceiling(self.wall_heights)
-
-    def draw_floor_and_ceiling(self, heights):
-        # note that we can make use of the fact that the ceiling and floor are exactly the same
-        # (the viewer is exactly in the middle of the screen)
-        # TODO with correct texturing
-        ceiling_tex = self.textures["test"]
-        floor_tex = self.textures["test"]
-        for y in range(max(heights)):
-            distance = y/self.pixheight   # TODO correct perspective
-            brightness = self.brightness(distance)
-            for x, h in enumerate(heights):
-                if y < h:
-                    # TODO correct texture tx,ty based on viewing direction and distance
-                    tx = x/self.pixwidth*4
-                    ty = -distance*2
-                    self.set_pixel(x, y, distance, brightness, ceiling_tex.sample(tx, ty))
-                    self.set_pixel(x, self.pixheight-y-1, distance, brightness, floor_tex.sample(tx, ty))
+        self.draw_floor_and_ceiling(self.wall_heights, d_screen)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
-        # TODO more efficient algorithm: use map square dx/dy steps to hop map squares, instead of 'tracing the ray'
+        # TODO more efficient algorithm: use map square dx/dy steps to hop map squares,
+        #      instead of 'tracing the ray' with small steps
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
         cast_ray = self.player_direction + camera_plane_ray
         distance = 0.0
@@ -131,13 +116,13 @@ class Raycaster:
         while distance <= self.BLACK_DISTANCE:
             distance += step_size
             ray += ray_step
-            square = self.get_map_square(ray.x, ray.y)
+            square = self.map_square(ray.x, ray.y)
             if square:
-                tx, intersection = self.calc_intersection_with_mapsquare(self.player_position, ray)
+                tx, intersection = self.intersection_with_mapsquare(self.player_position, ray)
                 return square, distance, tx
         return -1, distance, 0.0
 
-    def calc_intersection_with_mapsquare(self, camera: Vec2, cast_ray: Vec2) -> Tuple[float, Vec2]:
+    def intersection_with_mapsquare(self, camera: Vec2, cast_ray: Vec2) -> Tuple[float, Vec2]:
         """Returns (wall texture coordinate, Vec2(intersect x, intersect y))"""
         # TODO there has to be a more efficient way to calculate the intersection
         # first determine what quadrant of the square the camera is looking at,
@@ -182,7 +167,7 @@ class Raycaster:
             iy = 0.0 if direction.x == 0 else camera.y + (ix - camera.x) * direction.y / direction.x
             return iy - square_center.y + 0.5, Vec2(ix, iy)
 
-    def get_map_square(self, x: float, y: float) -> int:
+    def map_square(self, x: float, y: float) -> int:
         mx = int(x)
         my = int(y)
         if mx < 0 or mx >= len(self.map[0]) or my < 0 or my >= len(self.map):
@@ -192,7 +177,7 @@ class Raycaster:
     def brightness(self, distance: float) -> float:
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
-    def draw_wall_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
+    def draw_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
         wall_height = self.pixheight - 2*ceiling
@@ -205,6 +190,21 @@ class Raycaster:
         num_pixels = self.pixheight - 2*start_y
         for y in range(start_y, start_y+num_pixels):
             self.set_pixel(x, y, distance, 1.0, (0, 0, 0))
+
+    def draw_floor_and_ceiling(self, heights: List[int], d_screen: float) -> None:
+        # note that we can make use of the fact that the ceiling and floor are exactly the same
+        # (the viewer is exactly in the middle of the screen)
+        # TODO with correct texturing
+        ceiling_tex = self.textures["test"]
+        floor_tex = self.textures["test"]
+        for y in range(max(heights)):
+            distance = y/self.pixheight*self.BLACK_DISTANCE*3   # TODO correct perspective
+            brightness = self.brightness(distance)
+            for x, h in enumerate(heights):
+                if y < h:
+                    # TODO correct texture tx,ty based on viewing direction and distance
+                    self.set_pixel(x, y, distance, brightness, (0, 0, 255))
+                    self.set_pixel(x, self.pixheight-y-1, distance, brightness, (0, 255, 0))
 
     def move_player_forward_or_back(self, amount: float) -> None:
         # TODO enforce a certain minimum distance to a wall
@@ -225,7 +225,7 @@ class Raycaster:
 
     def rotate_player_to(self, angle: float) -> None:
         self.player_direction = Vec2.from_angle(angle)
-        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.FOV / 2)
+        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.HVOF / 2)
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
@@ -245,7 +245,7 @@ class Raycaster:
         #             rgb = self.rgb_brightness(rgb, brightness)
         #         self.image.putpixel((x, y), rgb)
         if rgb:
-            if z > 0.0 and brightness < 1.0:
+            if z > 0.0 and brightness != 1.0:
                 rgb = self.rgb_brightness(rgb, brightness)
             self.image.putpixel((x, y), rgb)
 

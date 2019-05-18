@@ -76,7 +76,7 @@ class Window(tkinter.Tk):
     def intersect(self) -> None:
         self.canvas.itemconfigure(self.square, fill='teal')
         cast_ray = self.camera + self.direction
-        texture_coordinate, intersection = self.raycaster.calc_intersection_with_mapsquare(self.camera, cast_ray)
+        texture_coordinate, intersection = self.raycaster.intersection_with_mapsquare(self.camera, cast_ray)
         sx, sy = self.to_screen(intersection.x, intersection.y)
         self.canvas.coords(self.intersect_point, sx-5, sy-5, sx+5, sy+5)
         self.texcoord_lbl.configure(text=f"texture coordinate: {texture_coordinate:.2f}")
