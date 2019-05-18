@@ -99,7 +99,7 @@ class Raycaster:
                 ceiling_size = int(self.pixheight * (1.0 - d_screen / distance) / 2.0)
                 self.wall_heights[x] = ceiling_size
                 if wall > 0:
-                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall] or self.textures["test"], texture_x)
+                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x)   # type: ignore
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
         self.draw_floor_and_ceiling(self.wall_heights, d_screen)
@@ -171,7 +171,7 @@ class Raycaster:
         mx = int(x)
         my = int(y)
         if mx < 0 or mx >= len(self.map[0]) or my < 0 or my >= len(self.map):
-            return 0
+            return 255
         return self.map[my][mx]
 
     def brightness(self, distance: float) -> float:
@@ -207,17 +207,26 @@ class Raycaster:
                     self.set_pixel(x, self.pixheight-y-1, distance, brightness, (0, 255, 0))
 
     def move_player_forward_or_back(self, amount: float) -> None:
-        # TODO enforce a certain minimum distance to a wall
         new = self.player_position + amount * self.player_direction.normalized()
-        if self.map[int(new.y)][int(new.x)] == 0:
-            self.player_position = new
+        self._move_player(new.x, new.y)
 
     def move_player_left_or_right(self, amount: float) -> None:
-        # TODO enforce a certain minimum distance to a wall
         dn = self.player_direction.normalized()
         new = self.player_position + amount * Vec2(dn.y, -dn.x)
-        if self.map[int(new.y)][int(new.x)] == 0:
-            self.player_position = new
+        self._move_player(new.x, new.y)
+
+    def _move_player(self, x: float, y: float) -> None:
+        if self.map_square(x, y) == 0:
+            # stay a certain minimum distance from the walls
+            if self.map_square(x + 0.1, y):
+                x = int(x) + 0.9
+            if self.map_square(x - 0.1, y):
+                x = int(x) + 0.1
+            if self.map_square(x, y + 0.1):
+                y = int(y) + 0.9
+            if self.map_square(x, y - 0.1):
+                y = int(y) + 0.1
+            self.player_position = Vec2(x, y)
 
     def rotate_player(self, angle: float) -> None:
         new_angle = self.player_direction.angle() + angle
