@@ -31,9 +31,8 @@ class Texture:
         return cls(io.BytesIO(data))
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
-        """Sample a texture color at the given coordinates, normalized 0.0 ... 1.0"""
-        s = self.SIZE-1
-        return self.image[int(x*s), int(y*s)]
+        """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
+        return self.image[int((x % 1.0)*self.SIZE), int((y % 1.0)*self.SIZE)]
 
 
 class Raycaster:
@@ -44,6 +43,7 @@ class Raycaster:
         self.pixwidth = pixwidth
         self.pixheight = pixheight
         self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
+        self.wall_heights = [0] * pixwidth
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
         self.textures = {
             "test": Texture.from_resource("textures/test.png"),
@@ -95,19 +95,30 @@ class Raycaster:
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
-                distance = max(0.1, distance)
                 ceiling_size = int((self.pixheight - self.pixheight/distance)/2)
-                if ceiling_size > 0:
-                    self.draw_ceiling(x, ceiling_size)
+                self.wall_heights[x] = ceiling_size
                 if wall > 0:
-                    texture = self.wall_textures[wall]  # XXX self.textures["test"]
-                    if not texture:
-                        raise KeyError("map specifies unknown wall texture " + str(wall))
-                    self.draw_wall_column(x, ceiling_size, distance, texture, texture_x)
+                    self.draw_wall_column(x, ceiling_size, distance, self.wall_textures[wall] or self.textures["test"], texture_x)
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
-                if ceiling_size > 0:
-                    self.draw_floor(x, self.pixheight - ceiling_size)  # floor is same height as ceiling
+        self.draw_floor_and_ceiling(self.wall_heights)
+
+    def draw_floor_and_ceiling(self, heights):
+        # note that we can make use of the fact that the ceiling and floor are exactly the same
+        # (the viewer is exactly in the middle of the screen)
+        # TODO with correct texturing
+        ceiling_tex = self.textures["test"]
+        floor_tex = self.textures["test"]
+        for y in range(max(heights)):
+            distance = y/self.pixheight   # TODO correct perspective
+            brightness = self.brightness(distance)
+            for x, h in enumerate(heights):
+                if y < h:
+                    # TODO correct texture tx,ty based on viewing direction and distance
+                    tx = x/self.pixwidth*4
+                    ty = -distance*2
+                    self.set_pixel(x, y, distance, brightness, ceiling_tex.sample(tx, ty))
+                    self.set_pixel(x, self.pixheight-y-1, distance, brightness, floor_tex.sample(tx, ty))
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO more efficient algorithm: use map square dx/dy steps to hop map squares, instead of 'tracing the ray'
@@ -178,30 +189,22 @@ class Raycaster:
             return 0
         return self.map[my][mx]
 
+    def brightness(self, distance: float) -> float:
+        return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
+
     def draw_wall_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
-        wall_height = self.pixheight - 2*ceiling - 1
+        wall_height = self.pixheight - 2*ceiling
+        brightness = self.brightness(distance)      # the whole column has the same brightness value
         for y in range(start_y, start_y+num_pixels):
-            self.set_pixel(x, y, distance, texture.sample(tx, (y-ceiling) / wall_height))
+            self.set_pixel(x, y, distance, brightness, texture.sample(tx, (y-ceiling) / wall_height))
 
     def draw_black_column(self, x: int, ceiling: int, distance: float) -> None:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
         for y in range(start_y, start_y+num_pixels):
-            self.set_pixel(x, y, distance, (0, 0, 0))
-
-    def draw_ceiling(self, x: int, num_y_pixels: int) -> None:
-        # TODO draw ceiling with texture
-        df = 1/((self.pixheight - self.pixheight/self.BLACK_DISTANCE)/2/self.BLACK_DISTANCE)
-        for y in range(num_y_pixels):
-            self.set_pixel(x, y, y * df, (20, 100, 255))
-
-    def draw_floor(self, x: int, y_start: int) -> None:
-        # TODO draw floor with texture
-        df = 1/((self.pixheight - self.pixheight/self.BLACK_DISTANCE)/2/self.BLACK_DISTANCE)
-        for y in range(y_start, self.pixheight):
-            self.set_pixel(x, y, (self.pixheight-y)*df, (0, 255, 20))
+            self.set_pixel(x, y, distance, 1.0, (0, 0, 0))
 
     def move_player_forward_or_back(self, amount: float) -> None:
         # TODO enforce a certain minimum distance to a wall
@@ -230,20 +233,20 @@ class Raycaster:
             for y in range(self.pixheight):
                 self.zbuffer[x][y] = infinity
 
-    def set_pixel(self, x: int, y: int, z: float, rgb: Optional[Tuple[int, int, int]]) -> None:
+    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgb: Optional[Tuple[int, int, int]]) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
-        The pixel is darkened according to its z-value, the distance.
+        The pixel's brightness is adjusted as well.
         If rgb is None, the pixel is transparent instead of having a color."""
         # TODO use the z-buffer (for now we ignore it because there's nothing using it at the moment)
         # if z <= self.zbuffer[x][y]:
         #     if rgb:
         #         self.zbuffer[x][y] = z
         #         if z > 0:
-        #             rgb = self.rgb_brightness(rgb, 1.0 - z / self.BLACK_DISTANCE)
+        #             rgb = self.rgb_brightness(rgb, brightness)
         #         self.image.putpixel((x, y), rgb)
         if rgb:
-            if z > 0:
-                rgb = self.rgb_brightness(rgb, 1.0 - z / self.BLACK_DISTANCE)
+            if z > 0.0 and brightness < 1.0:
+                rgb = self.rgb_brightness(rgb, brightness)
             self.image.putpixel((x, y), rgb)
 
     def rgb_brightness(self, rgb: Tuple[int, int, int], brightness: float) -> Tuple[int, int, int]:
@@ -253,5 +256,4 @@ class Raycaster:
         # from colorsys import rgb_to_hls, hls_to_rgb
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
-        brightness = max(0.0, min(1.0, brightness))
         return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
