@@ -1,34 +1,31 @@
 import pkgutil
 import io
-from math import pi, tan, radians
-from typing import Tuple, List, Optional, BinaryIO
+from math import pi, tan, radians, cos, sin
+from typing import Tuple, List, Optional, Union, BinaryIO
 from PIL import Image
 from .vector import Vec2
 
+# Optimization ideas:
+#
+# - get rid of the Vector class and inline trig functions instead.
+#   (but that results in code that is less easier to understand)#
 
-# optimization ideas:
-#
-# - get rid of the Vector class and inline trig functions
-#   (does result in code that is less easier to understand, imo)
-#
 
 class Texture:
     SIZE = 64      # must be power of 2
 
-    def __init__(self, image_data: BinaryIO) -> None:
-        img = Image.open(image_data)
-        if img.size != (self.SIZE, self.SIZE):
-            raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
-        if img.mode != "RGB":
-            raise IOError(f"texture is not RGB (must not have alpha-channel)")
-        self.image = img.load()
-
-    @classmethod
-    def from_resource(cls, name: str) -> "Texture":
-        data = pkgutil.get_data(__name__, name)
-        if not data:
-            raise IOError("can't find texture "+name)
-        return cls(io.BytesIO(data))
+    def __init__(self, image: Union[str, BinaryIO]) -> None:
+        if isinstance(image, str):
+            data = pkgutil.get_data(__name__, image)
+            if not data:
+                raise IOError("can't find texture "+image)
+            image = io.BytesIO(data)
+        with image, Image.open(image) as img:
+            if img.size != (self.SIZE, self.SIZE):
+                raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
+            if img.mode != "RGB":
+                raise IOError(f"texture is not RGB (must not have alpha-channel)")
+            self.image = img.load()
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
@@ -43,14 +40,14 @@ class Raycaster:
         self.pixwidth = pixwidth
         self.pixheight = pixheight
         self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
-        self.wall_heights = [0] * pixwidth
+        self.ceiling_sizes = [0] * pixwidth
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
         self.textures = {
-            "test": Texture.from_resource("textures/test.png"),
-            "floor": Texture.from_resource("textures/floor.png"),
-            "ceiling": Texture.from_resource("textures/ceiling.png"),
-            "wall-bricks": Texture.from_resource("textures/wall-bricks.png"),
-            "wall-stone": Texture.from_resource("textures/wall-stone.png"),
+            "test": Texture("textures/test.png"),
+            "floor": Texture("textures/floor.png"),
+            "ceiling": Texture("textures/ceiling.png"),
+            "wall-bricks": Texture("textures/wall-bricks.png"),
+            "wall-stone": Texture("textures/wall-stone.png"),
         }
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
@@ -97,12 +94,12 @@ class Raycaster:
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
                 ceiling_size = int(self.pixheight * (1.0 - d_screen / distance) / 2.0)
-                self.wall_heights[x] = ceiling_size
+                self.ceiling_sizes[x] = ceiling_size
                 if wall > 0:
                     self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x)   # type: ignore
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
-        self.draw_floor_and_ceiling(self.wall_heights, d_screen)
+        self.draw_floor_and_ceiling(self.ceiling_sizes, d_screen)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO more efficient algorithm: use map square dx/dy steps to hop map squares,
@@ -175,6 +172,7 @@ class Raycaster:
         return self.map[my][mx]
 
     def brightness(self, distance: float) -> float:
+        # TODO non-linear?
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
     def draw_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
@@ -191,50 +189,26 @@ class Raycaster:
         for y in range(start_y, start_y+num_pixels):
             self.set_pixel(x, y, distance, 1.0, (0, 0, 0))
 
-    def draw_floor_and_ceiling(self, heights: List[int], d_screen: float) -> None:
+    def draw_floor_and_ceiling(self, ceiling_sizes: List[int], d_screen: float) -> None:
         # note that we can make use of the fact that the ceiling and floor are exactly the same
         # (the viewer is exactly in the middle of the screen)
-        # TODO with correct texturing
-        ceiling_tex = self.textures["test"]
-        floor_tex = self.textures["test"]
-        for y in range(max(heights)):
-            distance = y/self.pixheight*self.BLACK_DISTANCE*3   # TODO correct perspective
-            brightness = self.brightness(distance)
-            for x, h in enumerate(heights):
+        mcs = max(ceiling_sizes)
+        if mcs <= 0:
+            return
+        max_height_possible = int(self.pixheight*(1.0-d_screen/self.BLACK_DISTANCE)/2.0)
+        ceiling_tex = self.textures["test"]     # TODO "ceiling"
+        floor_tex = self.textures["test"]       # TODO "floor"
+        for y in range(min(mcs, max_height_possible)):
+            sy = 0.5 - y / self.pixheight
+            d_ground = 0.5 * d_screen / sy          # how far, horizontally over the ground, is this away from us?
+            brightness = self.brightness(d_ground)
+            for x, h in enumerate(ceiling_sizes):
                 if y < h:
-                    # TODO correct texture tx,ty based on viewing direction and distance
-                    self.set_pixel(x, y, distance, brightness, (0, 0, 255))
-                    self.set_pixel(x, self.pixheight-y-1, distance, brightness, (0, 255, 0))
-
-    def move_player_forward_or_back(self, amount: float) -> None:
-        new = self.player_position + amount * self.player_direction.normalized()
-        self._move_player(new.x, new.y)
-
-    def move_player_left_or_right(self, amount: float) -> None:
-        dn = self.player_direction.normalized()
-        new = self.player_position + amount * Vec2(dn.y, -dn.x)
-        self._move_player(new.x, new.y)
-
-    def _move_player(self, x: float, y: float) -> None:
-        if self.map_square(x, y) == 0:
-            # stay a certain minimum distance from the walls
-            if self.map_square(x + 0.1, y):
-                x = int(x) + 0.9
-            if self.map_square(x - 0.1, y):
-                x = int(x) + 0.1
-            if self.map_square(x, y + 0.1):
-                y = int(y) + 0.9
-            if self.map_square(x, y - 0.1):
-                y = int(y) + 0.1
-            self.player_position = Vec2(x, y)
-
-    def rotate_player(self, angle: float) -> None:
-        new_angle = self.player_direction.angle() + angle
-        self.rotate_player_to(new_angle)
-
-    def rotate_player_to(self, angle: float) -> None:
-        self.player_direction = Vec2.from_angle(angle)
-        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.HVOF / 2)
+                    # TODO correct texture tx,ty
+                    tx = self.player_position.x + x/self.pixwidth*4
+                    ty = self.player_position.y + y/self.pixheight*4
+                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(tx, ty))
+                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(tx, ty))
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
@@ -266,3 +240,33 @@ class Raycaster:
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
         return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
+
+    def move_player_forward_or_back(self, amount: float) -> None:
+        new = self.player_position + amount * self.player_direction.normalized()
+        self._move_player(new.x, new.y)
+
+    def move_player_left_or_right(self, amount: float) -> None:
+        dn = self.player_direction.normalized()
+        new = self.player_position + amount * Vec2(dn.y, -dn.x)
+        self._move_player(new.x, new.y)
+
+    def _move_player(self, x: float, y: float) -> None:
+        if self.map_square(x, y) == 0:
+            # stay a certain minimum distance from the walls
+            if self.map_square(x + 0.1, y):
+                x = int(x) + 0.9
+            if self.map_square(x - 0.1, y):
+                x = int(x) + 0.1
+            if self.map_square(x, y + 0.1):
+                y = int(y) + 0.9
+            if self.map_square(x, y - 0.1):
+                y = int(y) + 0.1
+            self.player_position = Vec2(x, y)
+
+    def rotate_player(self, angle: float) -> None:
+        new_angle = self.player_direction.angle() + angle
+        self.rotate_player_to(new_angle)
+
+    def rotate_player_to(self, angle: float) -> None:
+        self.player_direction = Vec2.from_angle(angle)
+        self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.HVOF / 2)
