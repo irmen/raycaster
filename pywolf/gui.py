@@ -106,7 +106,7 @@ class RaycasterWindow(tkinter.Tk):
         self.after(20, self.redraw)
 
     def change_fov(self, e):
-        self.raycaster.HVOF = math.radians(self.var_fov.get())
+        self.raycaster.set_fov(math.radians(self.var_fov.get()))
         self.focus_set()
 
     def change_black_distance(self, e):

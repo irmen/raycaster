@@ -1,6 +1,6 @@
 import pkgutil
 import io
-from math import pi, tan, radians, cos, sin
+from math import pi, tan, radians
 from typing import Tuple, List, Optional, Union, BinaryIO
 from PIL import Image
 from .vector import Vec2
@@ -8,11 +8,11 @@ from .vector import Vec2
 # Optimization ideas:
 #
 # - get rid of the Vector class and inline trig functions instead.
-#   (but that results in code that is less easier to understand)#
+#   (but that results in code that is less easier to understand)
 
 
 class Texture:
-    SIZE = 64      # must be power of 2
+    SIZE = 64
 
     def __init__(self, image: Union[str, BinaryIO]) -> None:
         if isinstance(image, str):
@@ -190,25 +190,23 @@ class Raycaster:
             self.set_pixel(x, y, distance, 1.0, (0, 0, 0))
 
     def draw_floor_and_ceiling(self, ceiling_sizes: List[int], d_screen: float) -> None:
-        # note that we can make use of the fact that the ceiling and floor are exactly the same
-        # (the viewer is exactly in the middle of the screen)
         mcs = max(ceiling_sizes)
         if mcs <= 0:
             return
         max_height_possible = int(self.pixheight*(1.0-d_screen/self.BLACK_DISTANCE)/2.0)
-        ceiling_tex = self.textures["test"]     # TODO "ceiling"
-        floor_tex = self.textures["test"]       # TODO "floor"
+        ceiling_tex = self.textures["ceiling"]
+        floor_tex = self.textures["floor"]
         for y in range(min(mcs, max_height_possible)):
             sy = 0.5 - y / self.pixheight
             d_ground = 0.5 * d_screen / sy          # how far, horizontally over the ground, is this away from us?
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
                 if y < h:
-                    # TODO correct texture tx,ty
-                    tx = self.player_position.x + x/self.pixwidth*4
-                    ty = self.player_position.y + y/self.pixheight*4
-                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(tx, ty))
-                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(tx, ty))
+                    camera_plane_ray = (x / self.pixwidth - 0.5) * 2 * self.camera_plane
+                    ray = self.player_position + d_ground*(self.player_direction + camera_plane_ray)
+                    # we use the fact that the ceiling and floor are mirrored
+                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, -ray.y))
+                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, -ray.y))
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
@@ -270,3 +268,7 @@ class Raycaster:
     def rotate_player_to(self, angle: float) -> None:
         self.player_direction = Vec2.from_angle(angle)
         self.camera_plane = Vec2.from_angle(angle - pi / 2) * tan(self.HVOF / 2)
+
+    def set_fov(self, fov: float) -> None:
+        self.HVOF = fov
+        self.rotate_player(0.0)

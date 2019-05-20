@@ -1,6 +1,8 @@
 # Raycaster engine in Python
 
 This is an attempt at a Python 3 implementation of a classic raycaster. Think original DOS Wolfenstein.
+However, this version also has a texture mapped floor and ceiling, something that
+Wolfenstein lacked!
 
 Run this with any recent Python 3 version (tip: use Pypy for a huge performance boost):
 
@@ -12,16 +14,19 @@ is to learn how to build a raycaster engine, and not to create an actual playabl
 *No 3d acceleration or third party graphics libraries are used.* 
 The program uses just built-in Tkinter for the GUI and display, and Pillow to load the textures 
 and provide a pixel image display.
+On my system (Ryzen 2700 cpu, Linux) I get 10-20 fps when using regular CPython 
+and around 60 fps when using Pypy!  This is with the default 160x100 resolution.
+
+
+![screenshot](raycaster.png)
 
 
 ## Todo
 
-- draw texture mapped ceiling and floor (something DOS Wolfenstein didn't have!)
 - use a more efficient way to calculate the ray intersection with a map square
 - use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
-- interpolated texture sampling?
-- simple directional global lighting so not all walls appear the same brightness?
-- add some sprites (objects, monsters)?  this will require the Z-buffer as well.
+- interpolated texture sampling
+- add some sprites (objects, monsters)
 
 
 # World coordinate system
@@ -51,5 +56,5 @@ You can use W,S,A,D to walk, and rotating is done with the mouse (or Q,E).
 # Textures
 
 All textures (walls, ceiling, floors) are squares of 64x64 pixels.
-Could be another power of 2, but I settled on 64x64 considering the display size and
-the number of pixels the engine has to push.
+I settled on this rather small size considering the limited display size
+of the screen as a whole: high res textures can't be displayed anyway.
