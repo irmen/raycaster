@@ -111,6 +111,7 @@ class RaycasterWindow(tkinter.Tk):
 
     def change_black_distance(self, e):
         self.raycaster.BLACK_DISTANCE = self.var_bd.get()
+        self.minimap.view_distance = self.raycaster.BLACK_DISTANCE
         self.focus_set()
 
     def mouse_move(self, e):
