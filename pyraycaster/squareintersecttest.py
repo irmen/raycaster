@@ -1,12 +1,15 @@
+# This is a little test program to see if the ray-square intersection algorithm works correctly.
+#   $ python -m pyraycaster.squareintersecttest
+
 import tkinter
-from pywolf.vector import Vec2
-from pywolf.raycaster import Raycaster
+from .vector import Vec2
+from .raycaster import Raycaster
 from typing import Tuple
 
 width = 3.0
 height = 3.0
 screen_scale = 200
-square_origin = Vec2(1, 1)      # note: always on integer coordinates (squares are 1x1)
+square_origin = Vec2(1, 1)      # note that this has to be on integer coordinates (squares are 1x1)
 
 
 class Window(tkinter.Tk):

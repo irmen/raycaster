@@ -142,3 +142,8 @@ class RaycasterWindow(tkinter.Tk):
             self.after_idle(self.redraw)
         else:
             self.after(2, self.redraw)
+
+
+def main():
+    w = RaycasterWindow()
+    w.mainloop()

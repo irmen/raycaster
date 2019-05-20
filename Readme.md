@@ -6,7 +6,7 @@ Wolfenstein lacked!
 
 Run this with any recent Python 3 version (tip: use Pypy for a huge performance boost):
 
-    python -m pywolf
+    python -m pyraycaster
     
 This implementation favors readability and simplicity over speed, because my main goal
 is to learn how to build a raycaster engine, and not to create an actual playable game or something like that. 
