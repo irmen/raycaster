@@ -33,6 +33,8 @@ and around 60 fps when using Pypy!  This is with the default 160x100 resolution.
 
 The world is an infinite 2d plane built from squares. Each square measures 1x1 and
 can either be a wall (of a certain texture) or an empty space.
+The world should be fully enclosed so that rays always intersect with a wall.
+ 
 The engine uses the regular mathematical axis orientation so the positive X axis is to the right,
 and the positive Y axis is up.  This usually means the (0, 0) word map coordinate
 corresponds to the bottom left corner in the minimap display on the screen.

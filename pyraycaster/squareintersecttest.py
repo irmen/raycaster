@@ -79,11 +79,36 @@ class Window(tkinter.Tk):
     def intersect(self) -> None:
         self.canvas.itemconfigure(self.square, fill='teal')
         cast_ray = self.camera + self.direction
-        texture_coordinate, intersection = self.raycaster.intersection_with_mapsquare(self.camera, cast_ray)
+        texture_coordinate, intersection = self.raycaster.intersection_with_mapsquare_accurate(self.camera, cast_ray)
         sx, sy = self.to_screen(intersection.x, intersection.y)
         self.canvas.coords(self.intersect_point, sx-5, sy-5, sx+5, sy+5)
         self.texcoord_lbl.configure(text=f"texture coordinate: {texture_coordinate:.2f}")
 
 
-w = Window()
-w.mainloop()
+# for interactive test:
+def interactive():
+    w = Window()
+    w.mainloop()
+
+
+# for benchmarking:
+def bench():
+    r = Raycaster(10, 10)
+    camera = Vec2(6.5, 2.6)
+    cast_ray = Vec2(2.3, 6.2)
+    import time
+    begin = time.perf_counter()
+    for _ in range(100000):
+        r.intersection_with_mapsquare_accurate(camera, cast_ray)
+    duration = time.perf_counter() - begin
+    print(f"original accurate took: {duration:.2f} sec")
+    begin = time.perf_counter()
+    for _ in range(100000):
+        r.intersection_with_mapsquare_fast(cast_ray)
+    duration = time.perf_counter() - begin
+    print(f"new took: {duration:.2f} sec")
+
+
+interactive()
+# bench()
+

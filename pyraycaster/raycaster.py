@@ -102,8 +102,10 @@ class Raycaster:
         self.draw_floor_and_ceiling(self.ceiling_sizes, d_screen)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
-        # TODO more efficient algorithm: use map square dx/dy steps to hop map squares,
-        #      instead of 'tracing the ray' with small steps
+        # TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
+        #      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
+        #      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
+        #      That also makes the intersection test a lot simpler!?
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
         cast_ray = self.player_direction + camera_plane_ray
         distance = 0.0
@@ -115,14 +117,43 @@ class Raycaster:
             ray += ray_step
             square = self.map_square(ray.x, ray.y)
             if square:
-                tx, intersection = self.intersection_with_mapsquare(self.player_position, ray)
+                tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
+                # XXX tx = self.intersection_with_mapsquare_fast(ray)
                 return square, distance, tx
         return -1, distance, 0.0
 
-    def intersection_with_mapsquare(self, camera: Vec2, cast_ray: Vec2) -> Tuple[float, Vec2]:
-        """Returns (wall texture coordinate, Vec2(intersect x, intersect y))"""
-        # TODO there has to be a more efficient way to calculate the intersection
-        # first determine what quadrant of the square the camera is looking at,
+    def intersection_with_mapsquare_fast(self, cast_ray: Vec2) -> float:
+        """Cast_ray is the ray that we know intersects with a square.
+        This method returns only the needed wall texture sample coordinate."""
+        # Note: this method is rather fast, but is inaccurate.
+        # When the ray intersects near a corner of the square, sometimes the wrong edge is determined.
+        # Also, the texture sample coordinate is directly taken from the cast ray,
+        # instead of the actual intersection point.
+        square_center = Vec2(int(cast_ray.x) + 0.5, int(cast_ray.y) + 0.5)
+        angle = (cast_ray - square_center).angle()
+        # consider the angle (which gives the quadrant in the map square) rotated by pi/4
+        # to find the edge of the square it intersects with
+        if -pi*.25 <= angle < pi*.25:
+            # right edge
+            return cast_ray.y
+        elif pi*.25 <= angle < pi*.75:
+            # top edge
+            return -cast_ray.x
+        elif -pi*.75 <= angle < -pi*.25:
+            # bottom edge
+            return cast_ray.x
+        else:
+            # left edge
+            return -cast_ray.y
+
+    def intersection_with_mapsquare_accurate(self, camera: Vec2, cast_ray: Vec2) -> Tuple[float, Vec2]:
+        """Cast_ray is the ray that we know intersects with a square.
+        This method returns (wall texture sample coordinate, Vec2(intersect x, intersect y))."""
+        # Note: this method is a bit slow, but very accurate.
+        # It always determines the correct quadrant/edge that is intersected,
+        # and calculates the texture sample coordinate based off the actual intersection point
+        # of the cast camera ray with that square's edge.
+        # We now first determine what quadrant of the square the camera is looking at,
         # and based on the relative angle with the vertex, what edge of the square.
         direction = cast_ray - camera
         square_center = Vec2(int(cast_ray.x) + 0.5, int(cast_ray.y) + 0.5)
@@ -150,19 +181,19 @@ class Raycaster:
         if intersects == "top":
             iy = square_center.y + 0.5
             ix = 0.0 if direction.y == 0 else camera.x + (iy - camera.y) * direction.x / direction.y
-            return square_center.x + 0.5 - ix, Vec2(ix, iy)
+            return -ix, Vec2(ix, iy)
         elif intersects == "bottom":
             iy = square_center.y - 0.5
             ix = 0.0 if direction.y == 0 else camera.x + (iy - camera.y) * direction.x / direction.y
-            return ix - square_center.x + 0.5, Vec2(ix, iy)
+            return ix, Vec2(ix, iy)
         elif intersects == "left":
             ix = square_center.x - 0.5
             iy = 0.0 if direction.x == 0 else camera.y + (ix - camera.x) * direction.y / direction.x
-            return square_center.y + 0.5 - iy, Vec2(ix, iy)
+            return -iy, Vec2(ix, iy)
         else:   # right edge
             ix = square_center.x + 0.5
             iy = 0.0 if direction.x == 0 else camera.y + (ix - camera.x) * direction.y / direction.x
-            return iy - square_center.y + 0.5, Vec2(ix, iy)
+            return iy, Vec2(ix, iy)
 
     def map_square(self, x: float, y: float) -> int:
         mx = int(x)
