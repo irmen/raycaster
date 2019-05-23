@@ -1,35 +1,14 @@
-import pkgutil
-import io
 from math import pi, tan, radians
-from typing import Tuple, List, Optional, Union, BinaryIO
+from typing import Tuple, List, Optional
 from PIL import Image
 from .vector import Vec2
+from .mapstuff import Map, Texture
 
-# Optimization ideas:
+
+# Micro Optimization ideas:
 #
 # - get rid of the Vector class and inline trig functions instead.
 #   (but that results in code that is less easier to understand)
-
-
-class Texture:
-    SIZE = 64
-
-    def __init__(self, image: Union[str, BinaryIO]) -> None:
-        if isinstance(image, str):
-            data = pkgutil.get_data(__name__, image)
-            if not data:
-                raise IOError("can't find texture "+image)
-            image = io.BytesIO(data)
-        with image, Image.open(image) as img:
-            if img.size != (self.SIZE, self.SIZE):
-                raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
-            if img.mode != "RGB":
-                raise IOError(f"texture is not RGB (must not have alpha-channel)")
-            self.image = img.load()
-
-    def sample(self, x: float, y: float) -> Tuple[int, int, int]:
-        """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
-        return self.image[int((x % 1.0)*self.SIZE), int((y % 1.0)*self.SIZE)]
 
 
 class Raycaster:
@@ -48,41 +27,25 @@ class Raycaster:
             "ceiling": Texture("textures/ceiling.png"),
             "wall-bricks": Texture("textures/wall-bricks.png"),
             "wall-stone": Texture("textures/wall-stone.png"),
+            "creature-gargoyle": Texture("textures/gargoyle.png"),
+            "creature-hero": Texture("textures/legohero.png")
         }
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
         self.player_position = Vec2(0, 0)
         self.player_direction = Vec2(0, 1)
         self.camera_plane = Vec2(tan(self.HVOF / 2), 0)
-        self.map = self.load_map()      # rows, so map[y][x] to get a square
-
-    def load_map(self) -> List[bytearray]:
-        cmap = ["11111111111111111111",
-                "1..................1",
-                "1..111111222222.2221",
-                "1.....1.....2......1",
-                "1.....1.....2......1",
-                "1...111.....2222...1",
-                "1.....1222..2......1",
-                "1......222..2.1.2.11",
-                "1.........s........1",
-                "11111111111111111111"]         # (0,0) is bottom left
-        cmap.reverse()  # flip the Y axis so (0,0) is at bottom left
-
-        def translate(c):
-            if '0' <= c <= '9':
-                return ord(c)-ord('0')
-            return 0
-
-        for y, line in enumerate(cmap):
-            x = line.find('s')
-            if x >= 0:
-                self.player_position = Vec2(x + 0.5, y + 0.5)
-                break
-        m2 = []
-        for mapline in cmap:
-            m2.append(bytearray([translate(c) for c in mapline]))
-        return m2
+        self.map = Map(["11111111111111111111",
+                        "1..................1",
+                        "1..111111222222.2221",
+                        "1.....1.....2......1",
+                        "1.g...1.gh..2..h...1",
+                        "1...111.....2222...1",
+                        "1.....1222..2......1",
+                        "1....g.222..2.1.2.11",
+                        "1.h.......s........1",
+                        "11111111111111111111"])
+        self.player_position = Vec2(self.map.player_start[0]+0.5, self.map.player_start[1]+0.5)
 
     def tick(self, walltime_msec: float) -> None:
         # self.clear_zbuffer()        # TODO actually use the z-buffer for something
@@ -198,9 +161,9 @@ class Raycaster:
     def map_square(self, x: float, y: float) -> int:
         mx = int(x)
         my = int(y)
-        if mx < 0 or mx >= len(self.map[0]) or my < 0 or my >= len(self.map):
+        if mx < 0 or mx >= self.map.width or my < 0 or my >= self.map.height:
             return 255
-        return self.map[my][mx]
+        return self.map.get_wall(mx, my)
 
     def brightness(self, distance: float) -> float:
         # TODO non-linear?

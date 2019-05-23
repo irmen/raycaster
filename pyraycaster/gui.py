@@ -2,15 +2,14 @@ import tkinter
 import time
 import math
 from PIL import Image, ImageTk
-from .raycaster import Raycaster
+from .raycaster import Raycaster, Map
 
 
 class Minimap(tkinter.Canvas):
     SCALE = 20
 
-    def __init__(self, master, worldmap):
-        self.width = len(worldmap[0])
-        self.height = len(worldmap)
+    def __init__(self, master: tkinter.Widget, worldmap: Map) -> None:
+        self.width, self.height = worldmap.width, worldmap.height
         self.view_distance = 3
         super().__init__(master, width=self.width*self.SCALE, height=self.height*self.SCALE, bd=0, highlightthickness=0)
         colors = {
@@ -25,8 +24,9 @@ class Minimap(tkinter.Canvas):
             8: "cyan",
             9: "white"
         }
-        for y, line in enumerate(reversed(worldmap)):
-            for x, c in enumerate(line):
+        for y in range(self.height):
+            for x in range(self.width):
+                c = worldmap.get_wall(x, self.height-y-1)
                 self.create_rectangle(x*self.SCALE, y*self.SCALE, (x+1)*self.SCALE, (y+1)*self.SCALE, fill=colors[c])
         self.camera = self.create_oval(0, 0, 8, 8, fill='white', outline='brown')
         self.camera_angle = self.create_line(4, 4, 4+15, 4, fill='teal')
@@ -55,7 +55,7 @@ class Minimap(tkinter.Canvas):
 
 
 class RaycasterWindow(tkinter.Tk):
-    PIXEL_SCALE = 6
+    PIXEL_SCALE = 5
     PIXEL_WIDTH = 160
     PIXEL_HEIGHT = 100
 
