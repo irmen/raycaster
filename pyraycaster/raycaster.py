@@ -21,6 +21,7 @@ class Raycaster:
         self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
         self.ceiling_sizes = [0] * pixwidth
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
+        self.image_buf = self.image.load()
         self.textures = {
             "test": Texture("textures/test.png"),
             "floor": Texture("textures/floor.png"),
@@ -183,7 +184,7 @@ class Raycaster:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
         for y in range(start_y, start_y+num_pixels):
-            self.set_pixel(x, y, distance, 1.0, (0, 0, 0))
+            self.set_pixel(x, y, distance, 1.0, (0, 0, 0, 0))
 
     def draw_floor_and_ceiling(self, ceiling_sizes: List[int], d_screen: float) -> None:
         mcs = max(ceiling_sizes)
@@ -243,27 +244,25 @@ class Raycaster:
             for y in range(self.pixheight):
                 self.zbuffer[x][y] = infinity
 
-    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgb: Optional[Union[Tuple[int, int, int, int], Tuple[int, int, int]]]) -> None:
+    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgba: Optional[Tuple[int, int, int, int]]) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
-        If rgb is None, the pixel is transparent instead of having a color."""
+        If rgba is None, the pixel is transparent instead of having a color."""
         if z <= self.zbuffer[x][y]:
-            if rgb:
+            if rgba:
                 self.zbuffer[x][y] = z
                 if z > 0 and brightness != 1.0:
-                    rgb = self.rgb_brightness(rgb, brightness)
-                self.image.putpixel((x, y), rgb)
+                    rgba = self.rgba_brightness(rgba, brightness)
+                self.image_buf[x, y] = rgba
 
-    def rgb_brightness(self, rgb: Union[Tuple[int, int, int, int], Tuple[int, int, int]], brightness: float) -> Union[Tuple[int, int, int, int], Tuple[int, int, int]]:
+    def rgba_brightness(self, rgba: Tuple[int, int, int, int], brightness: float) -> Tuple[int, int, int, int]:
         """adjust brightness of the color. brightness 0=pitch black, 1=normal"""
         # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
         # it's almost as good and a lot faster to just scale the r,g,b values themselves.
         # from colorsys import rgb_to_hls, hls_to_rgb
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
-        if len(rgb)==3:
-            return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
-        return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness), rgb[3]
+        return int(rgba[0] * brightness), int(rgba[1] * brightness), int(rgba[2] * brightness), rgba[3]
 
     def move_player_forward_or_back(self, amount: float) -> None:
         new = self.player_position + amount * self.player_direction.normalized()

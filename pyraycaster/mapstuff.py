@@ -16,11 +16,10 @@ class Texture:
         with image, Image.open(image) as img:
             if img.size != (self.SIZE, self.SIZE):
                 raise IOError(f"texture is not {self.SIZE}x{self.SIZE}")
-            if img.mode not in ("RGBA", "RGB"):
-                raise IOError(f"texture is not RGB or RGBA")
+            img = img.convert('RGBA')
             self.image = img.load()
 
-    def sample(self, x: float, y: float) -> Union[Tuple[int, int, int], Tuple[int, int, int, int]]:
+    def sample(self, x: float, y: float) -> Tuple[int, int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
         return self.image[int((x % 1.0)*self.SIZE), int((y % 1.0)*self.SIZE)]
 
