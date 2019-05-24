@@ -72,7 +72,7 @@ class RaycasterWindow(tkinter.Tk):
         self.configure(borderwidth=self.PIXEL_SCALE, background="black")
         self.wm_title("pure Python raycaster")
         self.label = tkinter.Label(self, text="pixels", border=0)
-        self.update_gui_image()
+        self.init_gui_image()
         self.label.pack()
         bottomframe = tkinter.Frame(self)
         self.minimap = Minimap(bottomframe, self.raycaster.map)
@@ -125,11 +125,23 @@ class RaycasterWindow(tkinter.Tk):
     def mouse_button_change(self, down: bool) -> None:
         self.mouse_button_down = down
 
-    def update_gui_image(self):
+    def init_gui_image(self):
         self.imageTk = ImageTk.PhotoImage(self.raycaster.image.resize(
             (self.PIXEL_WIDTH*self.PIXEL_SCALE, self.PIXEL_HEIGHT*self.PIXEL_SCALE), Image.NEAREST))
         self.label.configure(image=self.imageTk)
         self.update_idletasks()
+
+    def update_gui_image(self):
+        self.imageTk.paste(
+            self.raycaster.image.resize(
+                (
+                    self.PIXEL_WIDTH*self.PIXEL_SCALE,
+                    self.PIXEL_HEIGHT*self.PIXEL_SCALE
+                ),
+                Image.NEAREST
+            ),
+            (0, 0)
+        )
 
     def redraw(self):
         self.raycaster.tick(int(time.monotonic() * 1000) - self.time_msec_epoch)
