@@ -195,7 +195,9 @@ class Raycaster:
         floor_tex = self.textures["floor"]
         for y in range(min(mcs, max_height_possible)):
             sy = 0.5 - y / self.pixheight
-            d_ground = 0.5 * d_screen / sy          # how far, horizontally over the ground, is this away from us?
+            d_ground = 0.01 + 0.5 * d_screen / sy    # how far, horizontally over the ground, is this away from us?
+            # the 0.01 is there to adjust for a tiny perspective issue that I can't explain mathematically,
+            # but it's there visually; the floor texture edges don't quite line up with the walls somehow, without it.
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
                 if y < h:
