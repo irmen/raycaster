@@ -1,5 +1,5 @@
-from math import pi, tan, radians
-from typing import Tuple, List, Optional
+from math import pi, tan, radians, cos
+from typing import Tuple, List, Optional, Union
 from PIL import Image
 from .vector import Vec2
 from .mapstuff import Map, Texture
@@ -28,7 +28,8 @@ class Raycaster:
             "wall-bricks": Texture("textures/wall-bricks.png"),
             "wall-stone": Texture("textures/wall-stone.png"),
             "creature-gargoyle": Texture("textures/gargoyle.png"),
-            "creature-hero": Texture("textures/legohero.png")
+            "creature-hero": Texture("textures/legohero-small.png"),
+            "treasure": Texture("textures/treasure.png")
         }
         self.wall_textures = [None, self.textures["wall-bricks"], self.textures["wall-stone"]]
         self.frame = 0
@@ -38,21 +39,21 @@ class Raycaster:
         self.map = Map(["11111111111111111111",
                         "1..................1",
                         "1..111111222222.2221",
-                        "1.....1.....2......1",
+                        "1.....1.....2.....t1",
                         "1.g...1.gh..2..h...1",
-                        "1...111.....2222...1",
-                        "1.....1222..2......1",
+                        "1...111t....2222...1",
+                        "1....t1222..2......1",
                         "1....g.222..2.1.2.11",
                         "1.h.......s........1",
                         "11111111111111111111"])
         self.player_position = Vec2(self.map.player_start[0]+0.5, self.map.player_start[1]+0.5)
 
     def tick(self, walltime_msec: float) -> None:
-        # self.clear_zbuffer()        # TODO actually use the z-buffer for something
+        self.clear_zbuffer()
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-        d_screen = 0.5/(tan(self.HVOF/2) * self.pixheight/self.pixwidth)
+        d_screen = self.screen_distance()
         for x in range(self.pixwidth):
             wall, distance, texture_x = self.cast_ray(x)
             if distance > 0:
@@ -63,6 +64,7 @@ class Raycaster:
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
         self.draw_floor_and_ceiling(self.ceiling_sizes, d_screen)
+        self.draw_sprites(d_screen)
 
     def cast_ray(self, pixel_x: int) -> Tuple[int, float, float]:
         # TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
@@ -71,7 +73,7 @@ class Raycaster:
         #      That also makes the intersection test a lot simpler!?
         camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
         cast_ray = self.player_direction + camera_plane_ray
-        distance = 0.0
+        distance = 0.0     # distance perpendicular to the camera view plane
         step_size = 0.02   # lower this to increase ray resolution
         ray = self.player_position
         ray_step = cast_ray * step_size
@@ -202,36 +204,66 @@ class Raycaster:
                     self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, -ray.y))
                     self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, -ray.y))
 
+    def draw_sprites(self, d_screen: float) -> None:
+        for (mx, my), mc in self.map.monsters.items():
+            monster_pos = Vec2(mx + 0.5, my + 0.5)
+            monster_vec = monster_pos - self.player_position
+            monster_direction = monster_vec.angle()
+            monster_distance = monster_vec.magnitude()
+            monster_view_angle = self.player_direction.angle() - monster_direction
+            if monster_view_angle < -pi:
+                monster_view_angle += 2*pi
+            elif monster_view_angle > pi:
+                monster_view_angle -= 2*pi
+            if monster_distance < self.BLACK_DISTANCE and abs(monster_view_angle) < self.HVOF/2:
+                if mc == "g":
+                    texture = self.textures["creature-gargoyle"]
+                elif mc == "h":
+                    texture = self.textures["creature-hero"]
+                elif mc == "t":
+                    texture = self.textures["treasure"]
+                else:
+                    raise KeyError("unknown monster: " + mc)
+                middle_pixel_column = int((0.5*(monster_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
+                monster_perpendicular_distance = monster_distance * cos(monster_view_angle)
+                ceiling_size = int(self.pixheight * (1.0 - d_screen / monster_perpendicular_distance) / 2.0)
+                if ceiling_size >= 0:
+                    brightness = self.brightness(monster_perpendicular_distance)
+                    pixel_height = self.pixheight - ceiling_size*2
+                    pixel_width = pixel_height
+                    for y in range(pixel_height):
+                        for x in range(max(0, int(middle_pixel_column - pixel_width/2)), min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
+                            tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, y/pixel_height)
+                            if len(tc) < 4 or tc[3] > 200:
+                                self.set_pixel(x, y+ceiling_size, monster_perpendicular_distance, brightness, tc)
+
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
         for x in range(self.pixwidth):
             for y in range(self.pixheight):
                 self.zbuffer[x][y] = infinity
 
-    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgb: Optional[Tuple[int, int, int]]) -> None:
+    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgb: Optional[Union[Tuple[int, int, int, int], Tuple[int, int, int]]]) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
         If rgb is None, the pixel is transparent instead of having a color."""
-        # TODO use the z-buffer (for now we ignore it because there's nothing using it at the moment)
-        # if z <= self.zbuffer[x][y]:
-        #     if rgb:
-        #         self.zbuffer[x][y] = z
-        #         if z > 0:
-        #             rgb = self.rgb_brightness(rgb, brightness)
-        #         self.image.putpixel((x, y), rgb)
-        if rgb:
-            if z > 0.0 and brightness != 1.0:
-                rgb = self.rgb_brightness(rgb, brightness)
-            self.image.putpixel((x, y), rgb)
+        if z <= self.zbuffer[x][y]:
+            if rgb:
+                self.zbuffer[x][y] = z
+                if z > 0 and brightness != 1.0:
+                    rgb = self.rgb_brightness(rgb, brightness)
+                self.image.putpixel((x, y), rgb)
 
-    def rgb_brightness(self, rgb: Tuple[int, int, int], brightness: float) -> Tuple[int, int, int]:
+    def rgb_brightness(self, rgb: Union[Tuple[int, int, int, int], Tuple[int, int, int]], brightness: float) -> Union[Tuple[int, int, int, int], Tuple[int, int, int]]:
         """adjust brightness of the color. brightness 0=pitch black, 1=normal"""
         # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
         # it's almost as good and a lot faster to just scale the r,g,b values themselves.
         # from colorsys import rgb_to_hls, hls_to_rgb
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
-        return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
+        if len(rgb)==3:
+            return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness)
+        return int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness), rgb[3]
 
     def move_player_forward_or_back(self, amount: float) -> None:
         new = self.player_position + amount * self.player_direction.normalized()
@@ -266,3 +298,7 @@ class Raycaster:
     def set_fov(self, fov: float) -> None:
         self.HVOF = fov
         self.rotate_player(0.0)
+
+    def screen_distance(self):
+        return 0.5/(tan(self.HVOF/2) * self.pixheight/self.pixwidth)
+

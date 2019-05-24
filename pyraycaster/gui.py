@@ -28,6 +28,9 @@ class Minimap(tkinter.Canvas):
             for x in range(self.width):
                 c = worldmap.get_wall(x, self.height-y-1)
                 self.create_rectangle(x*self.SCALE, y*self.SCALE, (x+1)*self.SCALE, (y+1)*self.SCALE, fill=colors[c])
+                m = worldmap.monsters.get((x, self.height-y-1))
+                if m:
+                    self.create_oval((x+0.2)*self.SCALE, (y+0.2)*self.SCALE, (x+0.8)*self.SCALE, (y+0.8)*self.SCALE, fill='red')
         self.camera = self.create_oval(0, 0, 8, 8, fill='white', outline='brown')
         self.camera_angle = self.create_line(4, 4, 4+15, 4, fill='teal')
         self.cam_polygon = self.create_polygon(10, 10, 20, 20, 30, 30, fill='', outline='blue')

@@ -20,7 +20,7 @@ class Texture:
                 raise IOError(f"texture is not RGB or RGBA")
             self.image = img.load()
 
-    def sample(self, x: float, y: float) -> Tuple[int, int, int]:
+    def sample(self, x: float, y: float) -> Union[Tuple[int, int, int], Tuple[int, int, int, int]]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
         return self.image[int((x % 1.0)*self.SIZE), int((y % 1.0)*self.SIZE)]
 
@@ -38,7 +38,7 @@ class Map:
             for x in range(self.width):
                 if line[x] == 's':
                     self.player_start = x, y
-                elif line[x] in "gh":
+                elif line[x] in "ght":
                     self.monsters[(x, y)] = line[x]
         for mapline in mapdef:
             self.map.append(bytearray([self.translate_walls(c) for c in mapline]))
