@@ -2,7 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/raycaster.iml" filepath="$PROJECT_DIR$/raycaster.iml" />
+      <module fileurl="file://$PROJECT_DIR$/kotlin/KotlinRaycaster.iml" filepath="$PROJECT_DIR$/kotlin/KotlinRaycaster.iml" />
+      <module fileurl="file://$PROJECT_DIR$/python/PythonRaycaster.iml" filepath="$PROJECT_DIR$/python/PythonRaycaster.iml" />
     </modules>
   </component>
 </project>

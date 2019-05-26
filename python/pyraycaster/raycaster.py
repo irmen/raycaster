@@ -1,5 +1,5 @@
 from math import pi, tan, radians, cos
-from typing import Tuple, List, Optional, Union
+from typing import Tuple, List, Optional
 from PIL import Image
 from .vector import Vec2
 from .mapstuff import Map, Texture
