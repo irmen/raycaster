@@ -1,4 +1,4 @@
-package net.razorvine
+package net.razorvine.raycaster
 
 import java.awt.*
 import java.awt.event.KeyEvent
@@ -14,29 +14,29 @@ import javax.swing.JPanel
 class RaycasterGui {
 
     companion object {
-        const val PIXELWIDTH = 320
-        const val PIXELHEIGHT = 200
+        const val PIXEL_WIDTH = 320
+        const val PIXEL_HEIGHT = 200
         const val PIXEL_SCALE = 4
     }
 
     init {
-        val image = BufferedImage(PIXELWIDTH, PIXELHEIGHT, BufferedImage.TYPE_INT_ARGB)
-        val engine = RaycasterEngine(PIXELWIDTH, PIXELHEIGHT, image)
+        val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
         val window = Window("Kotlin Raycaster", image, engine)
         Timer("draw timer", true).scheduleAtFixedRate(DrawTask(window, engine), 10, 1000 / 60)
     }
 
     private class PixelCanvas(private val image: BufferedImage) : JPanel(true) {
         init {
-            size = Dimension(PIXELWIDTH* PIXEL_SCALE, PIXELHEIGHT* PIXEL_SCALE)
-            preferredSize = Dimension(PIXELWIDTH* PIXEL_SCALE, PIXELHEIGHT* PIXEL_SCALE)
+            size = Dimension(PIXEL_WIDTH* PIXEL_SCALE, PIXEL_HEIGHT* PIXEL_SCALE)
+            preferredSize = Dimension(PIXEL_WIDTH* PIXEL_SCALE, PIXEL_HEIGHT* PIXEL_SCALE)
         }
 
         override fun paint(graphics: Graphics?) {
             val gfx2d = graphics as Graphics2D
             gfx2d.background = Color.PINK
             gfx2d.color = Color.GREEN
-            gfx2d.drawImage(image, 0, 0, PIXELWIDTH* PIXEL_SCALE, PIXELHEIGHT* PIXEL_SCALE, this)
+            gfx2d.drawImage(image, 0, 0, PIXEL_WIDTH* PIXEL_SCALE, PIXEL_HEIGHT* PIXEL_SCALE, this)
         }
     }
 
@@ -91,8 +91,3 @@ class RaycasterGui {
     }
 }
 
-fun main() {
-    javax.swing.SwingUtilities.invokeLater {
-        RaycasterGui()
-    }
-}

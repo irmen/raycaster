@@ -1,7 +1,7 @@
 import io
 import pkgutil
 from PIL import Image
-from typing import Union, List, Dict, Tuple, BinaryIO, Optional
+from typing import Union, List, Dict, Tuple, BinaryIO
 
 
 class Texture:
