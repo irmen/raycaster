@@ -7,7 +7,7 @@ class WorldMap(mapdef: List<String>) {
     var playerStartX: Int = 1
     var playerStartY: Int = 1
     val monsters: MutableMap<Pair<Int, Int>, Char> = mutableMapOf()
-    private val map: MutableList<ByteArray> = mutableListOf()
+    private val map: MutableList<IntArray> = mutableListOf()
 
     init {
         val revmap = mapdef.asReversed()  // flip the Y axis so (0,0) is at bottom left
@@ -23,7 +23,8 @@ class WorldMap(mapdef: List<String>) {
             }
         }
         revmap.forEach {
-            map.add( it.map { c->if(c in '0'..'9') c.toByte() else 0 }.toByteArray() )
+            println(it)
+            map.add( it.map { c->if(c in '0'..'9') c.toByte()-48 else 0 }.toIntArray() )
         }
     }
 

@@ -1,5 +1,6 @@
 package net.razorvine.raycaster
 
+import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.FileInputStream
 import java.io.InputStream
@@ -7,7 +8,7 @@ import java.lang.IllegalArgumentException
 import javax.imageio.ImageIO
 
 
-class Texture(val image: BufferedImage) {
+class Texture(private val image: BufferedImage) {
     companion object {
         const val SIZE = 64
 
@@ -25,14 +26,19 @@ class Texture(val image: BufferedImage) {
     }
 
     init {
-        if(image.width != SIZE || image.height != SIZE)
+        if (image.width != SIZE || image.height != SIZE)
             throw IllegalArgumentException("texture is not ${SIZE}x$SIZE")
     }
 
     /**
      * Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around
      */
-    fun sample(x: Double, y: Double): Int {
-        return image.getRGB(((x%1.0)*SIZE).toInt(), ((y%1.0)*SIZE).toInt())
+    fun sample(x: Double, y: Double): Color {
+        var xi = x % 1.0
+        if (xi < 0) xi += 1.0
+        var yi = y % 1.0
+        if (yi < 0) yi += 1.0
+        return Color(image.getRGB((SIZE * xi).toInt(), (SIZE * yi).toInt()))
     }
+
 }

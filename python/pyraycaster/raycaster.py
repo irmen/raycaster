@@ -64,6 +64,8 @@ class Raycaster:
                     self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x)   # type: ignore
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
+            else:
+                self.ceiling_sizes[x] = 0
         self.draw_floor_and_ceiling(self.ceiling_sizes, d_screen)
         self.draw_sprites(d_screen)
 
@@ -229,7 +231,7 @@ class Raycaster:
                     raise KeyError("unknown monster: " + mc)
                 middle_pixel_column = int((0.5*(monster_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 monster_perpendicular_distance = monster_distance * cos(monster_view_angle)
-                ceiling_size = int(self.pixheight * (1.0 - d_screen / monster_perpendicular_distance) / 2.0)
+                ceiling_size = int(self.pixheight * (1.0 - d_screen / monster_perpendicular_distance) / 2.0)  #  TODO can we get this from the ceiling heights array?
                 if ceiling_size >= 0:
                     brightness = self.brightness(monster_perpendicular_distance)
                     pixel_height = self.pixheight - ceiling_size*2
@@ -237,7 +239,7 @@ class Raycaster:
                     for y in range(pixel_height):
                         for x in range(max(0, int(middle_pixel_column - pixel_width/2)), min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
                             tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, y/pixel_height)
-                            if len(tc) < 4 or tc[3] > 200:
+                            if tc[3] > 200:  # consider alpha channel
                                 self.set_pixel(x, y+ceiling_size, monster_perpendicular_distance, brightness, tc)
 
     def clear_zbuffer(self) -> None:
@@ -250,14 +252,13 @@ class Raycaster:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
         If rgba is None, the pixel is transparent instead of having a color."""
-        if z <= self.zbuffer[x][y]:
-            if rgba:
-                self.zbuffer[x][y] = z
-                if z > 0 and brightness != 1.0:
-                    rgba = self.rgba_brightness(rgba, brightness)
-                self.image_buf[x, y] = rgba
+        if rgba and z <= self.zbuffer[x][y]:
+            self.zbuffer[x][y] = z
+            if z > 0 and brightness != 1.0:
+                rgba = self.color_brightness(rgba, brightness)
+            self.image_buf[x, y] = rgba
 
-    def rgba_brightness(self, rgba: Tuple[int, int, int, int], brightness: float) -> Tuple[int, int, int, int]:
+    def color_brightness(self, rgba: Tuple[int, int, int, int], brightness: float) -> Tuple[int, int, int, int]:
         """adjust brightness of the color. brightness 0=pitch black, 1=normal"""
         # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
         # it's almost as good and a lot faster to just scale the r,g,b values themselves.
