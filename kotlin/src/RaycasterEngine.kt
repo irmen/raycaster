@@ -272,6 +272,10 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
             } else {
                 image.setRGB(x, y, argb)
             }
+
+            // note: slightly faster may be to directly operate on the pixel buffer;
+            // add as a property on this class: val pixels = (image.raster.dataBuffer as DataBufferInt).data
+            // then here: pixels[x+y*pixwidth] = argb     instead of the setRGB()
         }
     }
 

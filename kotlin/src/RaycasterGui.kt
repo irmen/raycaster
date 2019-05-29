@@ -9,6 +9,7 @@ import java.util.*
 import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JPanel
+import kotlin.math.max
 import kotlin.math.min
 
 
@@ -26,8 +27,8 @@ class RaycasterGui {
         val minimap = MinimapCanvas(engine.map, 3)
         val window = Window("Kotlin Raycaster", minimap, image, engine)
 
-        val displayRefreshRate = min(144L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong())
-        Timer("draw timer", true).scheduleAtFixedRate(DrawTask(window, minimap, engine), 10, 1000 / displayRefreshRate)
+        val displayRefreshRate = max(30L, min(150L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong()))
+        Timer("draw timer", true).scheduleAtFixedRate(DrawTask(window, minimap, engine), 10, 1000/displayRefreshRate)
     }
 
     private class PixelCanvas(private val image: BufferedImage) : JPanel(true) {
@@ -76,8 +77,8 @@ class RaycasterGui {
         override fun paint(g: Graphics) {
             val g2 = g as Graphics2D
 
-            // note that the Y axis of the canvas is inverted
-            // draw the map
+            // note that the Y axis of the canvas is inverted!
+            // draw the map.
             g2.background = Color.BLACK
             g2.color = Color.YELLOW
             g2.clearRect(0, 0, width, height)
