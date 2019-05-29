@@ -54,8 +54,6 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         clearZbuffer()
         frame++
 
-        rotatePlayer(0.01)   // TODO implement mouse/kb controls
-
         // cast a ray per pixel column on the screen!
         // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         val scrDist = screenDistance()
@@ -317,8 +315,29 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         rotatePlayer(0.0)
     }
 
-    fun mousePos(x: Int, y: Int, absx: Int, absy: Int) {
-        // TODO
+    fun movePlayerForwardOrBack(amount: Double) {
+        val newpos = playerPosition + playerDirection.normalized() * amount
+        movePlayer(newpos.x, newpos.y)
     }
 
+    private fun movePlayer(x: Double, y: Double) {
+        if(mapSquare(x, y) == 0) {
+            playerPosition = Vec2d(x, y)
+            // stay a certain minimum distance from the walls
+            if(mapSquare(x + 0.1, y)>0)
+                playerPosition.x = x.toInt() + 0.9
+            if(mapSquare(x - 0.1, y)>0)
+                playerPosition.x = x.toInt() + 0.1
+            if(mapSquare(x, y + 0.1)>0)
+                playerPosition.y = y.toInt() + 0.9
+            if(mapSquare(x, y - 0.1)>0)
+                playerPosition.y = y.toInt() + 0.1
+        }
+    }
+
+    fun movePlayerLeftOrRight(amount: Double) {
+        val dn = playerDirection.normalized()
+        val newpos = playerPosition + Vec2d(dn.y, -dn.x) * amount
+        movePlayer(newpos.x, newpos.y)
+    }
 }

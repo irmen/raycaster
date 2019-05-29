@@ -3,14 +3,16 @@ package net.razorvine.raycaster
 import java.awt.*
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
-import java.awt.event.MouseMotionListener
 import java.awt.image.BufferedImage
 import java.util.*
 import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.event.MouseInputAdapter
+import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 
 class RaycasterGui {
@@ -122,57 +124,100 @@ class RaycasterGui {
     }
 
 
-    private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, engine: RaycasterEngine) : JFrame(title) {
+    private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, val engine: RaycasterEngine) : JFrame(title) {
         private var frame = 0
+        private var timerMillis = System.currentTimeMillis()
         private val canvas = PixelCanvas(image)
-        private val label = JLabel("frame counter here")
+        private val label = JLabel("frame counter here").also {
+            it.background = Color.BLACK
+            it.isOpaque = true
+            it.foreground = Color.WHITE
+        }
 
         init {
             layout = BorderLayout(0, 0)
             defaultCloseOperation = EXIT_ON_CLOSE
-            label.background = Color.BLACK
-            label.isOpaque = true
-            label.foreground = Color.WHITE
             add(label, BorderLayout.PAGE_START)
             add(canvas, BorderLayout.CENTER)
-            add(minimap, BorderLayout.PAGE_END)
+            val bottomframe = JPanel().also {it.background=Color.BLACK}
+            bottomframe.add(minimap)
+            bottomframe.add(JLabel("<html>Controls:<br>w,s,a,d - movement<br>q,e - rotation<br>mouse - rotation<br>left button - move (fine)</html>").also{ it.foreground=Color.LIGHT_GRAY})
+            add(bottomframe, BorderLayout.PAGE_END)
             minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
             pack()
             setLocationRelativeTo(null)
             isVisible = true
 
-            addMouseMotionListener(MouseListener(engine))
-            addKeyListener(KeyListener(engine))
+            addMouseMotionListener(MouseListener(this))
+            addMouseListener(MouseListener(this))
+            addKeyListener(KeyListener(this))
         }
 
         fun nextFrame() {
             frame++
-            label.text = "frame $frame"
+            val now = System.currentTimeMillis()
+            val duration = now - timerMillis
+            timerMillis = now
+            val fps = (1000.0/duration).roundToInt()
+            label.text = "frame $frame - $fps fps"
             canvas.repaint()
             minimap.repaint()
             Toolkit.getDefaultToolkit().sync()
         }
 
-        class KeyListener(val engine: RaycasterEngine) : java.awt.event.KeyListener {
+        var mouseButtonDown = false
+        var keysPressed = mutableSetOf<Char>()
+
+        class KeyListener(val parent: Window) : java.awt.event.KeyListener {
             override fun keyTyped(e: KeyEvent) {}
 
             override fun keyPressed(e: KeyEvent) {
-                println("pressed: $e")  // TODO
+                parent.keysPressed.add(e.keyChar)
             }
 
             override fun keyReleased(e: KeyEvent) {
-                println("released: $e") // TODO
+                parent.keysPressed.remove(e.keyChar)
             }
         }
 
-        class MouseListener(val engine: RaycasterEngine) : MouseMotionListener {
-            override fun mouseDragged(e: MouseEvent) = engine.mousePos(e.x, e.y, e.xOnScreen, e.yOnScreen)
-            override fun mouseMoved(e: MouseEvent) = engine.mousePos(e.x, e.y, e.xOnScreen, e.yOnScreen)
+
+        private class MouseListener(val parent: Window) : MouseInputAdapter() {
+            override fun mouseDragged(e: MouseEvent) = parent.mousePos(e.x, e.y, e.xOnScreen, e.yOnScreen)
+            override fun mouseMoved(e: MouseEvent) = parent.mousePos(e.x, e.y, e.xOnScreen, e.yOnScreen)
+            override fun mousePressed(e: MouseEvent) {
+                parent.mouseButtonDown = true
+            }
+            override fun mouseReleased(e: MouseEvent) {
+                parent.mouseButtonDown = false
+            }
         }
+
+        fun mousePos(mouseX: Int, mouseY: Int, absx: Int, absy: Int) {
+            val x = mouseX - width/2
+            engine.rotatePlayerTo(PI / 2.0 + 2.0 * PI * -x / 1200.0)
+        }
+
     }
 
     private class DrawTask(private val window: Window, private val minimap: MinimapCanvas, private val engine: RaycasterEngine) : TimerTask() {
         override fun run() {
+
+            // process inputs
+            if(window.mouseButtonDown)
+                engine.movePlayerForwardOrBack(0.01)
+            if('w' in window.keysPressed)
+                engine.movePlayerForwardOrBack(0.03)
+            if('s' in window.keysPressed)
+                engine.movePlayerForwardOrBack(-0.03)
+            if('a' in window.keysPressed)
+                engine.movePlayerLeftOrRight(-0.03)
+            if('d' in window.keysPressed)
+                engine.movePlayerLeftOrRight(0.03)
+            if('q' in window.keysPressed)
+                engine.rotatePlayer(PI/120.0)
+            if('e' in window.keysPressed)
+                engine.rotatePlayer(-PI/120.0)
+
             engine.tick()
             minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
             window.nextFrame()
