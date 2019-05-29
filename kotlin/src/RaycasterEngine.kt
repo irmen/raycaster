@@ -6,6 +6,11 @@ import java.lang.Math.toRadians
 import kotlin.math.*
 
 
+// TODO possible optimization: use Graphics2d to draw the columns and scale the sprites
+//      it also has to apply the brightness level to the pasted pixels somehow
+
+
+
 infix fun Int.fdiv(i: Int): Double = this / i.toDouble()
 
 
@@ -239,7 +244,6 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
                     val brightness = brightness(monsterPerpendicularDistance)
                     val pixelHeight = pixheight - ceilingSize*2
                     val pixelWidth = pixelHeight
-                    // TODO use graphics2d to scale the image instead of setting all pixels ourselves
                     for(y in 0 until pixelHeight) {
                         for(x in max(0, middlePixelColumn - pixelWidth/2)
                                 until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
