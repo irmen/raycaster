@@ -283,11 +283,11 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
      * it's almost as good and a lot faster to just scale the r,g,b values themselves.
      */
     private fun colorBrightness(argb: Int, brightness: Double): Int {
-        val alpha = argb shr 24 and 255
+        val alpha = argb and 0xff000000.toInt()
         val red = (argb shr 16 and 255) * brightness
         val green = (argb shr 8 and 255) * brightness
         val blue = (argb and 255) * brightness
-        return alpha and 255 shl 24 or (red.toInt() and 255 shl 16) or (green.toInt() and 255 shl 8) or (blue.toInt() and 255)
+        return alpha or (red.toInt() shl 16) or (green.toInt() shl 8) or (blue.toInt())
     }
 
     private fun clearZbuffer() {
