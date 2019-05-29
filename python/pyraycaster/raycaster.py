@@ -202,7 +202,7 @@ class Raycaster:
             # but it's there visually; the floor texture edges don't quite line up with the walls somehow, without it.
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
-                if y < h:
+                if y < h and d_ground < self.zbuffer[x][y]:
                     camera_plane_ray = (x / self.pixwidth - 0.5) * 2 * self.camera_plane
                     ray = self.player_position + d_ground*(self.player_direction + camera_plane_ray)
                     # we use the fact that the ceiling and floor are mirrored

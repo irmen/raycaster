@@ -204,7 +204,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
             // but it's there visually; the floor texture edges don't quite line up with the walls somehow, without it.
             val brightness = brightness(groundDistance)
             for ((x, h) in ceilingSizes.withIndex()) {
-                if (y < h) {
+                if (y < h && groundDistance<zbuffer[x][y]) {
                     val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
                     val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
                     // we use the fact that the ceiling and floor are mirrored
@@ -246,7 +246,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
                         for(x in max(0, middlePixelColumn - pixelWidth/2)
                                 until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
                             val tc = texture.sample(((x-middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
-                            if((tc shr 24 and 255) > 200)   // consider alpha channel
+                            if((tc ushr 24) > 200)   // consider alpha channel
                                 setPixel(x, y + ceilingSize, monsterPerpendicularDistance, brightness, tc)
                         }
                     }
