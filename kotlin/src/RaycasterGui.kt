@@ -26,10 +26,7 @@ class RaycasterGui {
         val minimap = MinimapCanvas(engine.map, 3)
         val window = Window("Kotlin Raycaster", minimap, image, engine)
 
-        //Code required to get the current refreshrate
         val displayRefreshRate = min(144L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong())
-        println(displayRefreshRate)
-
         Timer("draw timer", true).scheduleAtFixedRate(DrawTask(window, minimap, engine), 10, 1000 / displayRefreshRate)
     }
 

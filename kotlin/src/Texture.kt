@@ -1,6 +1,5 @@
 package net.razorvine.raycaster
 
-import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.FileInputStream
 import java.io.InputStream
@@ -33,12 +32,12 @@ class Texture(private val image: BufferedImage) {
     /**
      * Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around
      */
-    fun sample(x: Double, y: Double): Color {
+    fun sample(x: Double, y: Double): Int {
         var xi = x % 1.0
         if (xi < 0) xi += 1.0
         var yi = y % 1.0
         if (yi < 0) yi += 1.0
-        return Color(image.getRGB((SIZE * xi).toInt(), (SIZE * yi).toInt()))
+        return image.getRGB((SIZE * xi).toInt(), (SIZE * yi).toInt())
     }
 
 }

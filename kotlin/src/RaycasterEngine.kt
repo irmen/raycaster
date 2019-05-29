@@ -49,7 +49,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         clearZbuffer()
         frame++
 
-        rotatePlayer(0.01)
+        rotatePlayer(0.01)   // TODO implement mouse/kb controls
 
         // cast a ray per pixel column on the screen!
         // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
@@ -176,7 +176,6 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         val numPixels = pixheight - 2 * startY
         val wallHeight = pixheight - 2 * ceiling
         val brightness = brightness(distance)      // the whole column has the same brightness value
-        // TODO use graphics2d to scale the column instead of setting all pixels ourselves
         for (y in startY until startY + numPixels)
             setPixel(x, y, distance, brightness, texture.sample(tx, (y - ceiling) fdiv wallHeight))
     }
@@ -184,9 +183,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
     private fun drawBlackColumn(x: Int, ceiling: Int, distance: Double) {
         val startY = max(0, ceiling)
         val numPixels = pixheight - 2 * startY
-        // TODO use graphics2d to draw the black line instead of setting all pixels ourselves
         for (y in startY until startY + numPixels)
-            setPixel(x, y, distance, 1.0, Color.BLACK)
+            setPixel(x, y, distance, 1.0, Color.BLACK.rgb)
     }
 
     private fun drawFloorAndCeiling(ceilingSizes: IntArray, screenDistance: Double) {
@@ -246,7 +244,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
                         for(x in max(0, middlePixelColumn - pixelWidth/2)
                                 until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
                             val tc = texture.sample(((x-middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
-                            if(tc.alpha > 200)
+                            if((tc shr 24 and 255) > 200)   // consider alpha channel
                                 setPixel(x, y + ceilingSize, monsterPerpendicularDistance, brightness, tc)
                         }
                     }
@@ -260,15 +258,15 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
     /**
      * Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
      * The pixel's brightness is adjusted as well.
-     * If rgba is None, the pixel is transparent instead of having a color.
+     * If argb is None, the pixel is transparent instead of having a color.
      */
-    private fun setPixel(x: Int, y: Int, z: Double, brightness: Double, rgba: Color?) {
-        if (rgba!=null && z <= zbuffer[x][y]) {
+    private fun setPixel(x: Int, y: Int, z: Double, brightness: Double, argb: Int?) {
+        if (argb!=null && z < zbuffer[x][y]) {
             zbuffer[x][y] = z
             if (z > 0 && brightness != 1.0) {
-                image.setRGB(x, y, colorBrightness(rgba, brightness).rgb)
+                image.setRGB(x, y, colorBrightness(argb, brightness))
             } else {
-                image.setRGB(x, y, rgba.rgb)
+                image.setRGB(x, y, argb)
             }
         }
     }
@@ -278,8 +276,13 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
      * while theoretically it 's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
      * it's almost as good and a lot faster to just scale the r,g,b values themselves.
      */
-    private fun colorBrightness(rgba: Color, brightness: Double) =
-            Color((rgba.red * brightness).toInt(), (rgba.green * brightness).toInt(), (rgba.blue * brightness).toInt(), rgba.alpha)
+    private fun colorBrightness(argb: Int, brightness: Double): Int {
+        val alpha = argb shr 24 and 255
+        val red = (argb shr 16 and 255) * brightness
+        val green = (argb shr 8 and 255) * brightness
+        val blue = (argb and 255) * brightness
+        return alpha and 255 shl 24 or (red.toInt() and 255 shl 16) or (green.toInt() and 255 shl 8) or (blue.toInt() and 255)
+    }
 
     private fun clearZbuffer() {
         for (x in 0 until pixwidth) {

@@ -252,7 +252,7 @@ class Raycaster:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
         If rgba is None, the pixel is transparent instead of having a color."""
-        if rgba and z <= self.zbuffer[x][y]:
+        if rgba and z < self.zbuffer[x][y]:
             self.zbuffer[x][y] = z
             if z > 0 and brightness != 1.0:
                 rgba = self.color_brightness(rgba, brightness)
