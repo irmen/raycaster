@@ -25,7 +25,7 @@ and around 60 fps when using Pypy!  This is with the default 160x100 resolution.
 
 - use a more efficient way to calculate the ray intersection with a map square
 - use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
-- interpolated texture sampling
+- simple form of global wall illumination so not all walls have the same brightness?
 
 
 # World coordinate system

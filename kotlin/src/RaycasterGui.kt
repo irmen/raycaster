@@ -24,7 +24,7 @@ class RaycasterGui {
     }
 
     init {
-        val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
         val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
         val minimap = MinimapCanvas(engine.map, 3)
         val window = Window("Kotlin Raycaster", minimap, image, engine)

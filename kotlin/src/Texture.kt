@@ -18,7 +18,7 @@ class Texture(private val image: BufferedImage) {
 
         fun fromStream(stream: InputStream): Texture {
             val image = ImageIO.read(stream)
-            val image2 = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB)
+            val image2 = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_ARGB).also {it.accelerationPriority=0.9f}
             image2.graphics.drawImage(image, 0, 0, null)
             return Texture(image2)
         }
