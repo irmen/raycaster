@@ -171,7 +171,6 @@ class Raycaster:
         return self.map.get_wall(mx, my)
 
     def brightness(self, distance: float) -> float:
-        # TODO non-linear?
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
     def draw_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float) -> None:
@@ -231,16 +230,16 @@ class Raycaster:
                     raise KeyError("unknown monster: " + mc)
                 middle_pixel_column = int((0.5*(monster_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 monster_perpendicular_distance = monster_distance * cos(monster_view_angle)
-                ceiling_size = int(self.pixheight * (1.0 - d_screen / monster_perpendicular_distance) / 2.0)  #  TODO can we get this from the ceiling heights array?
-                if ceiling_size >= 0:
+                ceiling_above_sprite = int(self.pixheight * (1.0 - d_screen / monster_perpendicular_distance) / 2.0)
+                if ceiling_above_sprite >= 0:
                     brightness = self.brightness(monster_perpendicular_distance)
-                    pixel_height = self.pixheight - ceiling_size*2
+                    pixel_height = self.pixheight - ceiling_above_sprite*2
                     pixel_width = pixel_height
                     for y in range(pixel_height):
                         for x in range(max(0, int(middle_pixel_column - pixel_width/2)), min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
                             tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, y/pixel_height)
                             if tc[3] > 200:  # consider alpha channel
-                                self.set_pixel(x, y+ceiling_size, monster_perpendicular_distance, brightness, tc)
+                                self.set_pixel(x, y+ceiling_above_sprite, monster_perpendicular_distance, brightness, tc)
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")

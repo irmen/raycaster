@@ -237,17 +237,17 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
                 }
                 val middlePixelColumn = ((0.5*(monsterViewAngle/(HVOF/2.0))+0.5) * pixwidth).toInt()
                 val monsterPerpendicularDistance = monsterDistance * cos(monsterViewAngle)
-                val ceilingSize = (pixheight * (1.0 - d_screen / monsterPerpendicularDistance) / 2.0).toInt()       // TODO can we get this from the ceiling heights array?
-                if(ceilingSize >= 0) {
+                val ceilingAboveSprite = (pixheight * (1.0 - d_screen / monsterPerpendicularDistance) / 2.0).toInt()
+                if(ceilingAboveSprite >= 0) {
                     val brightness = brightness(monsterPerpendicularDistance)
-                    val pixelHeight = pixheight - ceilingSize*2
+                    val pixelHeight = pixheight - ceilingAboveSprite*2
                     val pixelWidth = pixelHeight
                     for(y in 0 until pixelHeight) {
                         for(x in max(0, middlePixelColumn - pixelWidth/2)
                                 until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
                             val tc = texture.sample(((x-middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
                             if((tc ushr 24) > 200)   // consider alpha channel
-                                setPixel(x, y + ceilingSize, monsterPerpendicularDistance, brightness, tc)
+                                setPixel(x, y + ceilingAboveSprite, monsterPerpendicularDistance, brightness, tc)
                         }
                     }
                 }
@@ -255,7 +255,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         }
     }
 
-    private fun brightness(distance: Double) = max(0.0, 1.0 - distance / BLACK_DISTANCE)  // TODO non-linear?
+    private fun brightness(distance: Double) = max(0.0, 1.0 - distance / BLACK_DISTANCE)
 
     /**
      * Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
