@@ -24,10 +24,10 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
             "1..111111222222.2221",
             "1.....1.....2.....t1",
             "1.g...1.gh..2..h...1",
-            "1...111t..s.2222...1",
+            "1...111t....2222...1",
             "1....t1222..2......1",
             "1....g.222..2.1.2.11",
-            "1.h................1",
+            "1.h.......s........1",
             "11111111111111111111"
     ))
 
@@ -44,7 +44,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
             "wall-bricks" to Texture.fromFile("python/pyraycaster/textures/wall-bricks.png"),
             "wall-stone" to Texture.fromFile("python/pyraycaster/textures/wall-stone.png"),
             "creature-gargoyle" to Texture.fromFile("python/pyraycaster/textures/gargoyle.png"),
-            "creature-hero" to Texture.fromFile("python/pyraycaster/textures/legohero-small.png"),
+            "creature-hero" to Texture.fromFile("python/pyraycaster/textures/legohero.png"),
             "treasure" to Texture.fromFile("python/pyraycaster/textures/treasure.png")
     )
     private val wallTextures = listOf(null, textures["wall-bricks"], textures["wall-stone"])
@@ -216,38 +216,52 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
     }
 
     private fun drawSprites(d_screen: Double) {
-        map.monsters.forEach {
+        map.sprites.forEach {
             val (mx, my) = it.key
             val mc = it.value
-            val monsterPos = Vec2d(mx + 0.5, my + 0.5)
-            val monsterVec = monsterPos - playerPosition
-            val monsterDirection = monsterVec.angle()
-            val monsterDistance = monsterVec.magnitude()
-            var monsterViewAngle = playerDirection.angle() - monsterDirection
-            if(monsterViewAngle < -PI)
-                monsterViewAngle += 2.0*PI
-            else if(monsterViewAngle > PI)
-                monsterViewAngle -= 2.0*PI
-            if(monsterDistance < BLACK_DISTANCE && abs(monsterViewAngle) < HVOF/2.0) {
-                val texture = when (mc) {
-                    'g' -> textures.getValue("creature-gargoyle")
-                    'h' -> textures.getValue("creature-hero")
-                    't' -> textures.getValue("treasure")
-                    else -> throw NoSuchElementException("unknown monster: $mc")
+            val spritePos = Vec2d(mx + 0.5, my + 0.5)
+            val spriteVec = spritePos - playerPosition
+            val spriteDirection = spriteVec.angle()
+            val spriteDistance = spriteVec.magnitude()
+            var spriteViewAngle = playerDirection.angle() - spriteDirection
+            if(spriteViewAngle < -PI)
+                spriteViewAngle += 2.0*PI
+            else if(spriteViewAngle > PI)
+                spriteViewAngle -= 2.0*PI
+            if(spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF/2.0) {
+                val spriteSize: Double
+                val texture: Texture
+                when (mc) {
+                    'g' -> {
+                        texture = textures.getValue("creature-gargoyle")
+                        spriteSize = 0.8
+                    }
+                    'h' -> {
+                        texture = textures.getValue("creature-hero")
+                        spriteSize = 0.7
+                    }
+                    't' -> {
+                        texture = textures.getValue("treasure")
+                        spriteSize = 0.6
+                    }
+                    else -> throw NoSuchElementException("unknown sprite: $mc")
                 }
-                val middlePixelColumn = ((0.5*(monsterViewAngle/(HVOF/2.0))+0.5) * pixwidth).toInt()
-                val monsterPerpendicularDistance = monsterDistance * cos(monsterViewAngle)
-                val ceilingAboveSprite = (pixheight * (1.0 - d_screen / monsterPerpendicularDistance) / 2.0).toInt()
-                if(ceilingAboveSprite >= 0) {
-                    val brightness = brightness(monsterPerpendicularDistance)
-                    val pixelHeight = pixheight - ceilingAboveSprite*2
+                val middlePixelColumn = ((0.5*(spriteViewAngle/(HVOF/2.0))+0.5) * pixwidth).toInt()
+                val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
+                var ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
+                if(ceilingAboveSpriteSquare >= 0) {
+                    val brightness = brightness(spritePerpendicularDistance)
+                    var pixelHeight = pixheight - ceilingAboveSpriteSquare*2
+                    val y_offset = ((1.0-spriteSize) * pixelHeight).toInt()
+                    ceilingAboveSpriteSquare += y_offset
+                    pixelHeight = (spriteSize * pixelHeight).toInt()
                     val pixelWidth = pixelHeight
                     for(y in 0 until pixelHeight) {
                         for(x in max(0, middlePixelColumn - pixelWidth/2)
                                 until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
                             val tc = texture.sample(((x-middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
                             if((tc ushr 24) > 200)   // consider alpha channel
-                                setPixel(x, y + ceilingAboveSprite, monsterPerpendicularDistance, brightness, tc)
+                                setPixel(x, y + ceilingAboveSpriteSquare, spritePerpendicularDistance, brightness, tc)
                         }
                     }
                 }

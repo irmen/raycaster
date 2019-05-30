@@ -6,7 +6,7 @@ class WorldMap(mapdef: List<String>) {
     val height = mapdef.size
     var playerStartX: Int = 1
     var playerStartY: Int = 1
-    val monsters: MutableMap<Pair<Int, Int>, Char> = mutableMapOf()
+    val sprites: MutableMap<Pair<Int, Int>, Char> = mutableMapOf()
     private val map: MutableList<IntArray> = mutableListOf()
 
     init {
@@ -18,12 +18,11 @@ class WorldMap(mapdef: List<String>) {
                     playerStartY = it.index
                 }
                 else if(it.value[x] in "ght") {
-                    monsters[Pair(x, it.index)] = it.value[x]
+                    sprites[Pair(x, it.index)] = it.value[x]
                 }
             }
         }
         revmap.forEach {
-            println(it)
             map.add( it.map { c->if(c in '0'..'9') c.toByte()-48 else 0 }.toIntArray() )
         }
     }

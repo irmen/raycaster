@@ -100,7 +100,7 @@ class RaycasterGui {
                     val wall = map.getWall(x, map.height - y - 1)
                     g2.color = squareColors[wall]
                     g2.fillRect(x * SCALE, y * SCALE, SCALE - 1, SCALE - 1)
-                    if (Pair(x, map.height - y - 1) in map.monsters) {
+                    if (Pair(x, map.height - y - 1) in map.sprites) {
                         g2.color = Color.ORANGE
                         g2.fillOval(x * SCALE + SCALE / 4, y * SCALE + SCALE / 4, SCALE / 2, SCALE / 2)
                     }

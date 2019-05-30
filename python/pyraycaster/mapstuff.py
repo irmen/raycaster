@@ -27,7 +27,7 @@ class Texture:
 class Map:
     def __init__(self, mapdef: List[str]) -> None:
         self.player_start = (1, 1)
-        self.monsters = {}    # type: Dict[Tuple[int, int], str]
+        self.sprites = {}    # type: Dict[Tuple[int, int], str]
         self.width = len(mapdef[0])
         self.height = len(mapdef)
         self.map = []   # type: List[bytearray]
@@ -38,7 +38,7 @@ class Map:
                 if line[x] == 's':
                     self.player_start = x, y
                 elif line[x] in "ght":
-                    self.monsters[(x, y)] = line[x]
+                    self.sprites[(x, y)] = line[x]
         for mapline in mapdef:
             self.map.append(bytearray([self.translate_walls(c) for c in mapline]))
 
