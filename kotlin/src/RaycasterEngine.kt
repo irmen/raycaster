@@ -50,7 +50,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
     private val wallTextures = listOf(null, textures["wall-bricks"], textures["wall-stone"])
 
 
-    fun tick() {
+    fun tick(timer: Long) {
         clearZbuffer()
         frame++
 

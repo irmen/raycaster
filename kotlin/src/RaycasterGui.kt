@@ -4,7 +4,6 @@ import java.awt.*
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
-import java.util.*
 import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -12,25 +11,37 @@ import javax.swing.event.MouseInputAdapter
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 
 class RaycasterGui {
-
     companion object {
         const val PIXEL_WIDTH = 320
         const val PIXEL_HEIGHT = 200
         const val PIXEL_SCALE = 4
     }
 
-    init {
-        val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
-        val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
-        val minimap = MinimapCanvas(engine.map, 3)
-        val window = Window("Kotlin Raycaster", minimap, image, engine)
+    private val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
+    private val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
+    private val minimap = MinimapCanvas(engine.map, 3)
+    private val window = Window("Kotlin Raycaster", minimap, image, engine)
+    private val desiredRefreshRate = max(30L, min(150L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong()))
 
-        val displayRefreshRate = max(30L, min(150L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong()))
-        Timer("draw timer", true).scheduleAtFixedRate(DrawTask(window, minimap, engine), 10, 1000/displayRefreshRate)
+    init {
+        val gameThread = Thread {
+            val timeEpoch = System.currentTimeMillis()
+            var lastTime = timeEpoch
+            var frame = 0L
+            while(true) {
+                val curTime = System.currentTimeMillis()
+                if((curTime-lastTime) >= (1000/desiredRefreshRate)) {
+                    frame++
+                    lastTime = curTime
+                    tick(curTime-timeEpoch, frame)
+                }
+                Thread.sleep(1)
+            }
+        }
+        gameThread.start()
     }
 
     private class PixelCanvas(private val image: BufferedImage) : JPanel(true) {
@@ -125,8 +136,6 @@ class RaycasterGui {
 
 
     private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, val engine: RaycasterEngine) : JFrame(title) {
-        private var frame = 0
-        private var timerMillis = System.currentTimeMillis()
         private val canvas = PixelCanvas(image)
         private val label = JLabel("frame counter here").also {
             it.background = Color.BLACK
@@ -153,16 +162,15 @@ class RaycasterGui {
             addKeyListener(KeyListener(this))
         }
 
-        fun nextFrame() {
-            frame++
-            val now = System.currentTimeMillis()
-            val duration = now - timerMillis
-            timerMillis = now
-            val fps = (1000.0/duration).roundToInt()
-            label.text = "frame $frame - $fps fps"
+        fun updateGraphics(timer: Long, frame: Long) {
+            if(timer>0) {
+                // calc and show fps
+                val fps = frame.toDouble() / timer * 1000.0
+                label.text = "average fps:  ${fps.toInt()}"
+            }
             canvas.repaint()
             minimap.repaint()
-            Toolkit.getDefaultToolkit().sync()
+            // Toolkit.getDefaultToolkit().sync()
         }
 
         var mouseButtonDown = false
@@ -199,28 +207,27 @@ class RaycasterGui {
 
     }
 
-    private class DrawTask(private val window: Window, private val minimap: MinimapCanvas, private val engine: RaycasterEngine) : TimerTask() {
-        override fun run() {
 
-            // process inputs
-            if(window.mouseButtonDown)
-                engine.movePlayerForwardOrBack(0.01)
-            if('w' in window.keysPressed)
-                engine.movePlayerForwardOrBack(0.03)
-            if('s' in window.keysPressed)
-                engine.movePlayerForwardOrBack(-0.03)
-            if('a' in window.keysPressed)
-                engine.movePlayerLeftOrRight(-0.03)
-            if('d' in window.keysPressed)
-                engine.movePlayerLeftOrRight(0.03)
-            if('q' in window.keysPressed)
-                engine.rotatePlayer(PI/120.0)
-            if('e' in window.keysPressed)
-                engine.rotatePlayer(-PI/120.0)
+    private fun tick(timer: Long, frame: Long) {
+        // process inputs
+        if(window.mouseButtonDown)
+            engine.movePlayerForwardOrBack(0.01)
+        if('w' in window.keysPressed)
+            engine.movePlayerForwardOrBack(0.03)
+        if('s' in window.keysPressed)
+            engine.movePlayerForwardOrBack(-0.03)
+        if('a' in window.keysPressed)
+            engine.movePlayerLeftOrRight(-0.03)
+        if('d' in window.keysPressed)
+            engine.movePlayerLeftOrRight(0.03)
+        if('q' in window.keysPressed)
+            engine.rotatePlayer(PI/120.0)
+        if('e' in window.keysPressed)
+            engine.rotatePlayer(-PI/120.0)
 
-            engine.tick()
-            minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
-            window.nextFrame()
-        }
+        engine.tick(timer)
+        minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
+        window.updateGraphics(timer, frame)
     }
+
 }
