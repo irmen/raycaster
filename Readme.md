@@ -28,8 +28,8 @@ The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution
 
 - use a more efficient way to calculate the ray intersection with a map square
 - use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
-- simple form of global wall illumination so not all walls have the same brightness?
-
+- tweak the sprite z positioning a bit, they now appear 'too far to the back' of the square.
+  This is because they're exactly in the middle while the sprite textures have a volumetric appearance.
 
 # World coordinate system
 

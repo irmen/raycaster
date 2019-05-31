@@ -57,14 +57,15 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         val scrDist = screenDistance()
         for (x in 0 until pixwidth) {
-            val (wall, distance, textureX) = castRay(x)
-            if (distance > 0) {
-                val ceilingSize = (pixheight * (1.0 - scrDist / distance) / 2.0).toInt()
+            val castResult = castRay(x)
+            if (castResult.distance > 0) {
+                val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
                 ceilingSizes[x] = ceilingSize
-                if (wall > 0)
-                    drawColumn(x, ceilingSize, distance, wallTextures[wall]!!, textureX)
+                if (castResult.squareContents > 0)
+                    drawColumn(x, ceilingSize, castResult.distance,
+                            wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
                 else
-                    drawBlackColumn(x, ceilingSize, distance)
+                    drawBlackColumn(x, ceilingSize, castResult.distance)
             } else
                 ceilingSizes[x] = 0
         }
@@ -72,7 +73,9 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         drawSprites(scrDist)
     }
 
-    private fun castRay(pixelX: Int): Triple<Int, Double, Double> {
+    private class RayCastResult(val squareContents: Int, val side: Intersection, val distance: Double, val textureX: Double)
+
+    private fun castRay(pixelX: Int): RayCastResult {
         // TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
         //      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
         //      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
@@ -88,12 +91,12 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             ray += rayStep
             val square = mapSquare(ray.x, ray.y)
             if(square>0) {
-                val (tx, _) = intersectionWithMapsquareAccurate(playerPosition, ray)
+                val (side, tx, _) = intersectionWithMapsquareAccurate(playerPosition, ray)
                 // XXX tx = intersection_with_mapsquare_fast (ray)
-                return Triple(square, distance, tx)
+                return RayCastResult(square, side, distance, tx)
             }
         }
-        return Triple(-1, distance, 0.0)
+        return RayCastResult(-1, Intersection.Top, distance, 0.0)
     }
 
     enum class Intersection {
@@ -105,9 +108,9 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
 
     /**
      * Cast_ray is the ray that we know intersects with a square.
-     * This method returns (wall texture sample coordinate, Vec2(intersect x, intersect y)).
+     * This method returns (side, wall texture sample coordinate, Vec2(intersect x, intersect y)).
      */
-    private fun intersectionWithMapsquareAccurate(camera: Vec2d, cast_ray: Vec2d): Pair<Double, Vec2d> {
+    private fun intersectionWithMapsquareAccurate(camera: Vec2d, cast_ray: Vec2d): Triple<Intersection, Double, Vec2d> {
         // Note: this method is a bit slow, but very accurate.
         // It always determines the correct quadrant/edge that is intersected,
         // and calculates the texture sample coordinate based off the actual intersection point
@@ -145,22 +148,22 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             Intersection.Top -> {
                 val iy = squareCenter.y + 0.5
                 val ix = if (direction.y == 0.0) 0.0 else camera.x + (iy - camera.y) * direction.x / direction.y
-                return Pair(-ix, Vec2d(ix, iy))
+                return Triple(intersects, -ix, Vec2d(ix, iy))
             }
             Intersection.Bottom -> {
                 val iy = squareCenter.y - 0.5
                 val ix = if (direction.y == 0.0) 0.0 else camera.x + (iy - camera.y) * direction.x / direction.y
-                return Pair(ix, Vec2d(ix, iy))
+                return Triple(intersects, ix, Vec2d(ix, iy))
             }
             Intersection.Left -> {
                 val ix = squareCenter.x - 0.5
                 val iy = if (direction.x == 0.0) 0.0 else camera.y + (ix - camera.x) * direction.y / direction.x
-                return Pair(-iy, Vec2d(ix, iy))
+                return Triple(intersects, -iy, Vec2d(ix, iy))
             }
             Intersection.Right -> {
                 val ix = squareCenter.x + 0.5
                 val iy = if (direction.x == 0.0) 0.0 else camera.y + (ix - camera.x) * direction.y / direction.x
-                return Pair(iy, Vec2d(ix, iy))
+                return Triple(intersects, iy, Vec2d(ix, iy))
             }
         }
     }
@@ -173,11 +176,14 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         return 255
     }
 
-    private fun drawColumn(x: Int, ceiling: Int, distance: Double, texture: Texture, tx: Double) {
+    private fun drawColumn(x: Int, ceiling: Int, distance: Double, texture: Texture, tx: Double, side: Intersection) {
         val startY = max(0, ceiling)
         val numPixels = pixheight - 2 * startY
         val wallHeight = pixheight - 2 * ceiling
         val brightness = brightness(distance)      // the whole column has the same brightness value
+        // if we wanted, a simple form of "sunlight" can be added here so that not all walls have the same brightness:
+        // if(side==Intersection.Top || side==Intersection.Right)  // make the sun 'shine' from bottom left
+        //    brightness *= 0.75
         for (y in startY until startY + numPixels)
             setPixel(x, y, distance, brightness, texture.sample(tx, (y - ceiling) fdiv wallHeight))
     }
