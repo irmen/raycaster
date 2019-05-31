@@ -1,10 +1,12 @@
-# Raycaster engine in Python
+# Raycaster engine in Python and Kotlin/JVM
 
-This is an attempt at a Python 3 implementation of a classic raycaster. Think original DOS Wolfenstein.
+This is an attempt to create a classic raycaster engine. Think original DOS Wolfenstein.
 However, this version also has a texture mapped floor and ceiling, something that
 Wolfenstein lacked!
 
-Run this with any recent Python 3 version (tip: use Pypy for a huge performance boost):
+* There is a Python 3 and a Kotlin/JVM implementation of the same engine *
+
+Run this with any recent Python 3 version (use Pypy for a huge performance boost):
 
     python -m pyraycaster
     
@@ -17,6 +19,7 @@ and provide a pixel image display.
 On my system (Ryzen 2700 cpu, Linux) I get 10-20 fps when using regular CPython 
 and around 60 fps when using Pypy!  This is with the default 160x100 resolution.
 
+The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution.
 
 ![screenshot](raycaster.png)
 
