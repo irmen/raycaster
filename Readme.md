@@ -4,7 +4,7 @@ This is an attempt to create a classic raycaster engine. Think original DOS Wolf
 However, this version also has a texture mapped floor and ceiling, something that
 Wolfenstein lacked!
 
-* There is a Python 3 and a Kotlin/JVM implementation of the same engine *
+**There is a Python 3 and a Kotlin/JVM implementation of the same engine.**
 
 Run this with any recent Python 3 version (use Pypy for a huge performance boost):
 
