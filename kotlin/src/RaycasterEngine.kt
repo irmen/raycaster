@@ -2,21 +2,20 @@ package net.razorvine.raycaster
 
 import java.awt.Color
 import java.awt.image.BufferedImage
+import java.awt.image.DataBufferInt
 import java.lang.Math.toRadians
 import kotlin.math.*
-
-
-// TODO possible optimization: use Graphics2d to draw the columns and scale the sprites
-//      it also has to apply the brightness level to the pasted pixels somehow
-
 
 
 infix fun Int.fdiv(i: Int): Double = this / i.toDouble()
 
 
-class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, private val image: BufferedImage) {
+class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, image: BufferedImage) {
     var HVOF = toRadians(80.0)
     var BLACK_DISTANCE = 4.0
+
+    // instead of drawing pixels on the image using setRGB, we manipulate the pixel buffer directly:
+    private val pixels: IntArray = (image.raster.dataBuffer as DataBufferInt).data
 
     val map = WorldMap(listOf(
             "11111111111111111111",
@@ -280,14 +279,12 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, pri
         if (argb!=null && z < zbuffer[x][y]) {
             zbuffer[x][y] = z
             if (z > 0 && brightness != 1.0) {
-                image.setRGB(x, y, colorBrightness(argb, brightness))
+                pixels[x+y*pixwidth] = colorBrightness(argb, brightness)
+                //image.setRGB(x, y, colorBrightness(argb, brightness))
             } else {
-                image.setRGB(x, y, argb)
+                pixels[x+y*pixwidth] = argb
+                //image.setRGB(x, y, argb)
             }
-
-            // note: slightly faster may be to directly operate on the pixel buffer;
-            // add as a property on this class: val pixels = (image.raster.dataBuffer as DataBufferInt).data
-            // then here: pixels[x+y*pixwidth] = argb     instead of the setRGB()
         }
     }
 

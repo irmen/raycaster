@@ -15,9 +15,9 @@ import kotlin.math.min
 
 class RaycasterGui {
     companion object {
-        const val PIXEL_WIDTH = 320
-        const val PIXEL_HEIGHT = 200
-        const val PIXEL_SCALE = 4
+        const val PIXEL_WIDTH = 400
+        const val PIXEL_HEIGHT = 250
+        const val PIXEL_SCALE = 3
     }
 
     private val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
