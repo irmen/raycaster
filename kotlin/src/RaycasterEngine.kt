@@ -252,7 +252,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
                 val middlePixelColumn = ((0.5*(spriteViewAngle/(HVOF/2.0))+0.5) * pixwidth).toInt()
                 val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
                 var ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
-                if(ceilingAboveSpriteSquare >= 0) {
+                if(ceilingAboveSpriteSquare >= 0) {  // TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
                     val brightness = brightness(spritePerpendicularDistance)
                     var pixelHeight = pixheight - ceilingAboveSpriteSquare*2
                     val y_offset = ((1.0-spriteSize) * pixelHeight).toInt()

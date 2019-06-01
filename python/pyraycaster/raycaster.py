@@ -235,7 +235,7 @@ class Raycaster:
                 middle_pixel_column = int((0.5*(sprite_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
                 ceiling_above_sprite_square = int(self.pixheight * (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
-                if ceiling_above_sprite_square >= 0:
+                if ceiling_above_sprite_square >= 0:    # TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
                     brightness = self.brightness(sprite_perpendicular_distance)
                     pixel_height = self.pixheight - ceiling_above_sprite_square*2
                     y_offset = int((1.0-sprite_size) * pixel_height)

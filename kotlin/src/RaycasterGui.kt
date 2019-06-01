@@ -44,7 +44,7 @@ class RaycasterGui {
         gameThread.start()
     }
 
-    private class PixelCanvas(private val image: BufferedImage) : JPanel(true) {
+    private class PixelCanvas(private val image: BufferedImage) : JPanel() {
         init {
             size = Dimension(PIXEL_WIDTH * PIXEL_SCALE, PIXEL_HEIGHT * PIXEL_SCALE)
             preferredSize = Dimension(PIXEL_WIDTH * PIXEL_SCALE, PIXEL_HEIGHT * PIXEL_SCALE)
@@ -59,7 +59,7 @@ class RaycasterGui {
     }
 
 
-    private class MinimapCanvas(private val map: WorldMap, var viewDistance: Int) : JPanel(true) {
+    private class MinimapCanvas(private val map: WorldMap, var viewDistance: Int) : JPanel() {
 
         companion object {
             const val SCALE = 20
@@ -137,20 +137,16 @@ class RaycasterGui {
 
     private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, val engine: RaycasterEngine) : JFrame(title) {
         private val canvas = PixelCanvas(image)
-        private val label = JLabel("frame counter here").also {
-            it.background = Color.BLACK
-            it.isOpaque = true
-            it.foreground = Color.WHITE
-        }
+        private val fpsLabel = JLabel("frame counter here").also { it.foreground = Color.GRAY }
 
         init {
             layout = BorderLayout(0, 0)
             defaultCloseOperation = EXIT_ON_CLOSE
-            add(label, BorderLayout.PAGE_START)
             add(canvas, BorderLayout.CENTER)
             val bottomframe = JPanel().also {it.background=Color.BLACK}
             bottomframe.add(minimap)
             bottomframe.add(JLabel("<html>Controls:<br>w,s,a,d - movement<br>q,e - rotation<br>mouse - rotation<br>left button - move (fine)</html>").also{ it.foreground=Color.LIGHT_GRAY})
+            bottomframe.add(fpsLabel)
             add(bottomframe, BorderLayout.PAGE_END)
             minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
             pack()
@@ -166,7 +162,7 @@ class RaycasterGui {
             if(timer>0) {
                 // calc and show fps
                 val fps = frame.toDouble() / timer * 1000.0
-                label.text = "average fps:  ${fps.toInt()}"
+                fpsLabel.text = "average fps:  ${fps.toInt()}"
             }
             canvas.repaint()
             minimap.repaint()
