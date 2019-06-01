@@ -199,17 +199,15 @@ class Raycaster:
         floor_tex = self.textures["floor"]
         for y in range(min(mcs, max_height_possible)):
             sy = 0.5 - y / self.pixheight
-            d_ground = 0.01 + 0.5 * d_screen / sy    # how far, horizontally over the ground, is this away from us?
-            # the 0.01 is there to adjust for a tiny perspective issue that I can't explain mathematically,
-            # but it's there visually; the floor texture edges don't quite line up with the walls somehow, without it.
+            d_ground = 0.5 * d_screen / sy    # how far, horizontally over the ground, is this away from us?
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
                 if y < h and d_ground < self.zbuffer[x][y]:
                     camera_plane_ray = (x / self.pixwidth - 0.5) * 2 * self.camera_plane
                     ray = self.player_position + d_ground*(self.player_direction + camera_plane_ray)
                     # we use the fact that the ceiling and floor are mirrored
-                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, -ray.y))
-                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, -ray.y))
+                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, ray.y))
+                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, ray.y))
 
     def draw_sprites(self, d_screen: float) -> None:
         for (mx, my), mc in self.map.sprites.items():

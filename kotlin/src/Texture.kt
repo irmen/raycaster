@@ -1,15 +1,16 @@
 package net.razorvine.raycaster
 
 import java.awt.image.BufferedImage
+import java.awt.image.DataBufferInt
 import java.io.FileInputStream
 import java.io.InputStream
 import java.lang.IllegalArgumentException
 import javax.imageio.ImageIO
 
 
-class Texture(private val image: BufferedImage) {
+class Texture(image: BufferedImage) {
     companion object {
-        const val SIZE = 64
+        const val SIZE = 64         // must be a power of 2 because of efficient coordinate wrapping
 
         fun fromFile(name: String): Texture {
             val stream = FileInputStream(name)
@@ -24,20 +25,23 @@ class Texture(private val image: BufferedImage) {
         }
     }
 
+    private val pixels: IntArray
+
     init {
         if (image.width != SIZE || image.height != SIZE)
             throw IllegalArgumentException("texture is not ${SIZE}x$SIZE")
+
+        // instead of drawing pixels on the image using setRGB, we manipulate the pixel buffer directly:
+        pixels = (image.raster.dataBuffer as DataBufferInt).data
     }
 
     /**
      * Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around
      */
     fun sample(x: Double, y: Double): Int {
-        var xi = x % 1.0
-        if (xi < 0) xi += 1.0
-        var yi = y % 1.0
-        if (yi < 0) yi += 1.0
-        return image.getRGB((SIZE * xi).toInt(), (SIZE * yi).toInt())
+        val xi = (x*SIZE).toInt() and (SIZE-1)
+        val yi = (y*SIZE).toInt() and (SIZE-1)
+        return pixels[xi + yi*SIZE]
     }
 
 }

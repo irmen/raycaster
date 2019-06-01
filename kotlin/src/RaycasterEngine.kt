@@ -46,7 +46,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             "creature-hero" to Texture.fromFile("python/pyraycaster/textures/legohero.png"),
             "treasure" to Texture.fromFile("python/pyraycaster/textures/treasure.png")
     )
-    private val wallTextures = listOf(null, textures["wall-bricks"], textures["wall-stone"])
+    private val wallTextures = listOf(textures["test"], textures["wall-bricks"], textures["wall-stone"])
 
 
     fun tick(timer: Long) {
@@ -204,17 +204,15 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         val floorTex = textures.getValue("floor")
         for (y in 0 until min(mcs, maxHeightPossible)) {
             val sy = 0.5 - (y fdiv pixheight)
-            val groundDistance = 0.01 + 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
-            // the 0.01 is there to adjust for a tiny perspective issue that I can't explain mathematically,
-            // but it's there visually; the floor texture edges don't quite line up with the walls somehow, without it.
+            val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
             val brightness = brightness(groundDistance)
             for ((x, h) in ceilingSizes.withIndex()) {
                 if (y < h && groundDistance<zbuffer[x][y]) {
                     val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
                     val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
                     // we use the fact that the ceiling and floor are mirrored
-                    setPixel(x, y, groundDistance, brightness, ceilingTex.sample(ray.x, -ray.y))
-                    setPixel(x, pixheight - y - 1, groundDistance, brightness, floorTex.sample(ray.x, -ray.y))
+                    setPixel(x, y, groundDistance, brightness, ceilingTex.sample(ray.x, ray.y))
+                    setPixel(x, pixheight - y - 1, groundDistance, brightness, floorTex.sample(ray.x, ray.y))
                 }
             }
         }

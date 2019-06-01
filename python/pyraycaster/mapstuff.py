@@ -13,7 +13,8 @@ class Intersection(Enum):
 
 
 class Texture:
-    SIZE = 64
+    SIZE = 64           # must be a power of 2 because of efficient coordinate wrapping
+    SIZE_MASK = SIZE-1
 
     def __init__(self, image: Union[str, BinaryIO]) -> None:
         if isinstance(image, str):
@@ -29,7 +30,9 @@ class Texture:
 
     def sample(self, x: float, y: float) -> Tuple[int, int, int, int]:
         """Sample a texture color at the given coordinates, normalized 0.0 ... 0.999999999, wrapping around"""
-        return self.image[int((x % 1.0)*self.SIZE), int((y % 1.0)*self.SIZE)]
+        xi = int(x*self.SIZE)
+        yi = int(y*self.SIZE)
+        return self.image[xi & self.SIZE_MASK, yi & self.SIZE_MASK]
 
 
 class Map:
