@@ -31,6 +31,8 @@ The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution
 - sprite clipping instead of removal when they get to near
 - tweak the sprite z positioning a bit, they now appear 'too far to the back' of the square.
   This is because they're exactly in the middle while the sprite textures have a volumetric appearance.
+- make the camera height flexible (instead of sitting exactly in the middle)
+
 
 # World coordinate system
 
