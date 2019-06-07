@@ -102,5 +102,3 @@ if __name__ == "__main__":
     print(v2)
     v2.rotate(pi)
     print(v2)
-
-

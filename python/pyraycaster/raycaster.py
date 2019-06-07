@@ -85,7 +85,7 @@ class Raycaster:
             ray += ray_step
             square = self.map_square(ray.x, ray.y)
             if square:
-                side , tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
+                side, tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
                 # XXX tx = self.intersection_with_mapsquare_fast(ray)
                 return square, distance, tx, side
         return -1, distance, 0.0, Intersection.TOP
@@ -173,7 +173,8 @@ class Raycaster:
     def brightness(self, distance: float) -> float:
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
-    def draw_column(self, x: int, ceiling: int, distance: float, texture: Texture, tx: float, side: Intersection) -> None:
+    def draw_column(self, x: int, ceiling: int, distance: float,
+                    texture: Texture, tx: float, side: Intersection) -> None:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
         wall_height = self.pixheight - 2*ceiling
@@ -234,8 +235,10 @@ class Raycaster:
                     raise KeyError("unknown sprite: " + mc)
                 middle_pixel_column = int((0.5*(sprite_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
-                ceiling_above_sprite_square = int(self.pixheight * (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
-                if ceiling_above_sprite_square >= 0:    # TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
+                ceiling_above_sprite_square = int(self.pixheight *
+                                                  (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
+                if ceiling_above_sprite_square >= 0:
+                    # TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
                     brightness = self.brightness(sprite_perpendicular_distance)
                     pixel_height = self.pixheight - ceiling_above_sprite_square*2
                     y_offset = int((1.0-sprite_size) * pixel_height)
@@ -243,10 +246,12 @@ class Raycaster:
                     pixel_height = int(sprite_size * pixel_height)
                     pixel_width = pixel_height
                     for y in range(pixel_height):
-                        for x in range(max(0, int(middle_pixel_column - pixel_width/2)), min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
+                        for x in range(max(0, int(middle_pixel_column - pixel_width/2)),
+                                       min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
                             tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, y/pixel_height)
                             if tc[3] > 200:  # consider alpha channel
-                                self.set_pixel(x, y+ceiling_above_sprite_square, sprite_perpendicular_distance, brightness, tc)
+                                self.set_pixel(x, y+ceiling_above_sprite_square,
+                                               sprite_perpendicular_distance, brightness, tc)
 
     def clear_zbuffer(self) -> None:
         infinity = float("inf")
@@ -309,4 +314,3 @@ class Raycaster:
 
     def screen_distance(self):
         return 0.5/(tan(self.HVOF/2) * self.pixheight/self.pixwidth)
-

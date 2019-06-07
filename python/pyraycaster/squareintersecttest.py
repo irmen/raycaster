@@ -16,7 +16,8 @@ class Window(tkinter.Tk):
     def __init__(self):
         super().__init__()
         self.wm_title("camera ray intersection with map square")
-        lb = tkinter.Label(self, text="click to set camera, move mouse to cast view ray\nNote: all squares are 1x1 units and occur on integer coordinates")
+        lb = tkinter.Label(self, text="click to set camera, move mouse to cast view ray\n"
+                                      "Note: all squares are 1x1 units and occur on integer coordinates")
         lb.pack()
         self.raycaster = Raycaster(10, 10)
         self.canvas = tkinter.Canvas(self, width=width*screen_scale, height=height*screen_scale)
@@ -111,4 +112,3 @@ def bench():
 
 interactive()
 # bench()
-
