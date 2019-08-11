@@ -15,9 +15,9 @@ import kotlin.math.min
 
 class RaycasterGui {
     companion object {
-        const val PIXEL_WIDTH = 400
-        const val PIXEL_HEIGHT = 250
-        const val PIXEL_SCALE = 3
+        const val PIXEL_WIDTH = 768
+        const val PIXEL_HEIGHT = 480
+        const val PIXEL_SCALE = 2
     }
 
     private val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
@@ -137,7 +137,7 @@ class RaycasterGui {
 
     private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, val engine: RaycasterEngine) : JFrame(title) {
         private val canvas = PixelCanvas(image)
-        private val fpsLabel = JLabel("frame counter here").also { it.foreground = Color.GRAY }
+        private val fpsLabel = JLabel("frame counter here").also { it.foreground = Color.GRAY; it.font=Font("Monospaced", Font.PLAIN, 12) }
 
         init {
             layout = BorderLayout(0, 0)
@@ -158,11 +158,14 @@ class RaycasterGui {
             addKeyListener(KeyListener(this))
         }
 
-        fun updateGraphics(timer: Long, frame: Long) {
+        fun updateGraphics(timer: Long, frame: Long, renderTimes: RenderTimes) {
             if(timer>0) {
                 // calc and show fps
                 val fps = frame.toDouble() / timer * 1000.0
-                fpsLabel.text = "average fps:  ${fps.toInt()}"
+                fpsLabel.text = "<html>average fps:  ${fps.toInt()}<br><br>" +
+                        "&nbsp;  walls:  ${renderTimes.wallsMs} ms<br>" +
+                        "&nbsp;  ceiling&floor:  ${renderTimes.ceilingAndFloorMs} ms<br>" +
+                        "&nbsp;  sprites:  ${renderTimes.spritesMs} ms</html>"
             }
             canvas.repaint()
             minimap.repaint()
@@ -223,7 +226,7 @@ class RaycasterGui {
 
         engine.tick(timer)
         minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
-        window.updateGraphics(timer, frame)
+        window.updateGraphics(timer, frame, engine.renderTimes)
     }
 
 }

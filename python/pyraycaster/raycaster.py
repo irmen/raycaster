@@ -54,6 +54,8 @@ class Raycaster:
         self.frame += 1
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
+        # NOTE: multithreading is not useful because of Python's GIL
+        #       multiprocessing is probably not useful because of IPC overhead to sync the world state...
         d_screen = self.screen_distance()
         for x in range(self.pixwidth):
             wall, distance, texture_x, side = self.cast_ray(x)

@@ -5,9 +5,13 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.lang.Math.toRadians
 import kotlin.math.*
+import kotlin.system.measureTimeMillis
 
 
 infix fun Int.fdiv(i: Int): Double = this / i.toDouble()
+
+
+class RenderTimes(val wallsMs: Long, val ceilingAndFloorMs: Long, val spritesMs: Long)
 
 
 class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, image: BufferedImage) {
@@ -48,29 +52,44 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     )
     private val wallTextures = listOf(textures["test"], textures["wall-bricks"], textures["wall-stone"])
 
+    private var durationWallsMs: Long = 0
+    private var durationCeilingFloorMs: Long = 0
+    private var durationSpritesMs: Long = 0
+
+    val renderTimes: RenderTimes
+        get() = RenderTimes(durationWallsMs, durationCeilingFloorMs, durationSpritesMs)
 
     fun tick(timer: Long) {
         clearZbuffer()
         frame++
-
-        // cast a ray per pixel column on the screen!
-        // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         val scrDist = screenDistance()
-        for (x in 0 until pixwidth) {
-            val castResult = castRay(x)
-            if (castResult.distance > 0) {
-                val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
-                ceilingSizes[x] = ceilingSize
-                if (castResult.squareContents > 0)
-                    drawColumn(x, ceilingSize, castResult.distance,
-                            wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
-                else
-                    drawBlackColumn(x, ceilingSize, castResult.distance)
-            } else
-                ceilingSizes[x] = 0
+
+        durationWallsMs = measureTimeMillis {
+            // cast a ray per pixel column on the screen!
+            // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
+            // TODO multi threaded?
+            for (x in 0 until pixwidth) {
+                val castResult = castRay(x)
+                if (castResult.distance > 0) {
+                    val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
+                    ceilingSizes[x] = ceilingSize
+                    if (castResult.squareContents > 0)
+                        drawColumn(x, ceilingSize, castResult.distance,
+                                wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
+                    else
+                        drawBlackColumn(x, ceilingSize, castResult.distance)
+                } else
+                    ceilingSizes[x] = 0
+            }
         }
-        drawFloorAndCeiling(ceilingSizes, scrDist)
-        drawSprites(scrDist)
+
+        durationCeilingFloorMs = measureTimeMillis {
+            drawFloorAndCeiling(ceilingSizes, scrDist)
+        }
+
+        durationSpritesMs = measureTimeMillis {
+            drawSprites(scrDist)
+        }
     }
 
     private class RayCastResult(val squareContents: Int, val side: Intersection, val distance: Double, val textureX: Double)
@@ -206,8 +225,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val sy = 0.5 - (y fdiv pixheight)
             val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
             val brightness = brightness(groundDistance)
-            for ((x, h) in ceilingSizes.withIndex()) {
-                if (y < h && groundDistance<zbuffer[x][y]) {
+            for(x in 0 until pixwidth) {
+                if (y < ceilingSizes[x] && groundDistance < zbuffer[x][y]) {
                     val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
                     val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
                     // we use the fact that the ceiling and floor are mirrored
