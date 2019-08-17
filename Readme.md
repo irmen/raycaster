@@ -1,4 +1,4 @@
-# Raycaster engine in Python and Kotlin/JVM
+# Raycaster engine in Python, and the same in Kotlin/JVM
 
 This is an attempt to create a classic raycaster engine. Think original DOS Wolfenstein.
 However, this version also has a texture mapped floor and ceiling, something that
