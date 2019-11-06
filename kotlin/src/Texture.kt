@@ -28,8 +28,7 @@ class Texture(image: BufferedImage) {
     private val pixels: IntArray
 
     init {
-        if (image.width != SIZE || image.height != SIZE)
-            throw IllegalArgumentException("texture is not ${SIZE}x$SIZE")
+        require(image.width == SIZE && image.height == SIZE) { "texture is not ${SIZE}x$SIZE" }
 
         // instead of drawing pixels on the image using setRGB, we manipulate the pixel buffer directly:
         pixels = (image.raster.dataBuffer as DataBufferInt).data

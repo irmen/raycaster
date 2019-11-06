@@ -4,6 +4,8 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.lang.Math.toRadians
+import java.util.Arrays
+import kotlin.NoSuchElementException
 import kotlin.math.*
 import kotlin.system.measureTimeMillis
 
@@ -39,7 +41,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     var cameraPlane = Vec2d(tan(HVOF / 2.0), 0.0)
     private var frame = 0
     private val ceilingSizes = IntArray(pixwidth)
-    private val zbuffer = List(pixwidth) { DoubleArray(pixheight) }
+    private val zbuffer = DoubleArray(pixwidth*pixheight)
     private val textures = mapOf(
             "test" to Texture.fromFile("python/pyraycaster/textures/test.png"),
             "floor" to Texture.fromFile("python/pyraycaster/textures/floor.png"),
@@ -60,8 +62,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         get() = RenderTimes(durationWallsMs, durationCeilingFloorMs, durationSpritesMs)
 
     fun tick(timer: Long) {
-        clearZbuffer()
         frame++
+        Arrays.fill(zbuffer, Double.POSITIVE_INFINITY)      // clear the z-buffer
         val scrDist = screenDistance()
 
         durationWallsMs = measureTimeMillis {
@@ -226,7 +228,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
             val brightness = brightness(groundDistance)
             for(x in 0 until pixwidth) {
-                if (y < ceilingSizes[x] && groundDistance < zbuffer[x][y]) {
+                if (y < ceilingSizes[x] && groundDistance < zbuffer[x+y*pixwidth]) {
                     val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
                     val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
                     // we use the fact that the ceiling and floor are mirrored
@@ -299,13 +301,14 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
      * If argb is None, the pixel is transparent instead of having a color.
      */
     private fun setPixel(x: Int, y: Int, z: Double, brightness: Double, argb: Int?) {
-        if (argb!=null && z < zbuffer[x][y]) {
-            zbuffer[x][y] = z
+        val pixelOffset = x+y*pixwidth
+        if (argb!=null && z < zbuffer[pixelOffset]) {
+            zbuffer[pixelOffset] = z
             if (z > 0 && brightness != 1.0) {
-                pixels[x+y*pixwidth] = colorBrightness(argb, brightness)
+                pixels[pixelOffset] = colorBrightness(argb, brightness)
                 //image.setRGB(x, y, colorBrightness(argb, brightness))
             } else {
-                pixels[x+y*pixwidth] = argb
+                pixels[pixelOffset] = argb
                 //image.setRGB(x, y, argb)
             }
         }
@@ -322,14 +325,6 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         val green = (argb shr 8 and 255) * brightness
         val blue = (argb and 255) * brightness
         return alpha or (red.toInt() shl 16) or (green.toInt() shl 8) or (blue.toInt())
-    }
-
-    private fun clearZbuffer() {
-        for (x in 0 until pixwidth) {
-            for (y in 0 until pixheight) {
-                zbuffer[x][y] = Double.POSITIVE_INFINITY
-            }
-        }
     }
 
     private fun screenDistance() = 0.5 / (tan(HVOF / 2.0) * pixheight / pixwidth)
