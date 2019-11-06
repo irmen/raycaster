@@ -63,7 +63,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     val renderTimes: RenderTimes
         get() = RenderTimes(durationWallsMs, durationCeilingFloorMs, durationSpritesMs)
 
-    private val numRenderThreads = Runtime.getRuntime().availableProcessors() / 2
+    private val numRenderThreads = max(1, Runtime.getRuntime().availableProcessors() / 2)
     private val renderThreadpool = Executors.newFixedThreadPool(numRenderThreads)
 
     fun tick(timer: Long) {
