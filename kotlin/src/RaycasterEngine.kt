@@ -227,7 +227,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     }
 
     private fun drawFloorAndCeiling(ceilingSizes: IntArray, screenDistance: Double) {
-        // TODO make this multi threaded; this is the most cpu intensive part of the screen rendering
+        // the horizontal spans are processed with multiple concurrent threads
+        // (this part of the screen drawing is the most cpu intensive)
 
         val mcs = ceilingSizes.max()
         if (mcs == null || mcs <= 0)
@@ -235,20 +236,25 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         val maxHeightPossible = (pixheight * (1.0 - screenDistance / BLACK_DISTANCE) / 2.0).toInt()
         val ceilingTex = textures.getValue("ceiling")
         val floorTex = textures.getValue("floor")
-        for (y in 0 until min(mcs, maxHeightPossible)) {
-            val sy = 0.5 - (y fdiv pixheight)
-            val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
-            val brightness = brightness(groundDistance)
-            for (x in 0 until pixwidth) {
-                if (y < ceilingSizes[x] && groundDistance < zbuffer[x + y * pixwidth]) {
-                    val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
-                    val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
-                    // we use the fact that the ceiling and floor are mirrored
-                    setPixel(x, y, groundDistance, brightness, ceilingTex.sample(ray.x, ray.y))
-                    setPixel(x, pixheight - y - 1, groundDistance, brightness, floorTex.sample(ray.x, ray.y))
+
+        val maxY = min(mcs, maxHeightPossible)
+        val workers = (0 until maxY).map { y ->
+            Callable {
+                val sy = 0.5 - (y fdiv pixheight)
+                val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
+                val brightness = brightness(groundDistance)
+                for (x in 0 until pixwidth) {
+                    if (y < ceilingSizes[x] && groundDistance < zbuffer[x + y * pixwidth]) {
+                        val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
+                        val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
+                        // we use the fact that the ceiling and floor are mirrored
+                        setPixel(x, y, groundDistance, brightness, ceilingTex.sample(ray.x, ray.y))
+                        setPixel(x, pixheight - y - 1, groundDistance, brightness, floorTex.sample(ray.x, ray.y))
+                    }
                 }
             }
         }
+        renderThreadpool.invokeAll(workers)
     }
 
     private fun drawSprites(d_screen: Double) {
