@@ -18,7 +18,8 @@ class Raycaster:
     def __init__(self, pixwidth: int, pixheight: int) -> None:
         self.pixwidth = pixwidth
         self.pixheight = pixheight
-        self.zbuffer = [[0.0] * pixheight for _ in range(pixwidth)]
+        self.empty_zbuffer = [float("inf")] * pixheight * pixwidth
+        self.zbuffer = self.empty_zbuffer[:]
         self.ceiling_sizes = [0] * pixwidth
         self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
         self.image_buf = self.image.load()
@@ -50,8 +51,8 @@ class Raycaster:
         self.player_position = Vec2(self.map.player_start[0]+0.5, self.map.player_start[1]+0.5)
 
     def tick(self, walltime_msec: float) -> None:
-        self.clear_zbuffer()
         self.frame += 1
+        self.zbuffer[:] = self.empty_zbuffer    # clear zbuffer
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         # NOTE: multithreading is not useful because of Python's GIL
@@ -205,7 +206,7 @@ class Raycaster:
             d_ground = 0.5 * d_screen / sy    # how far, horizontally over the ground, is this away from us?
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
-                if y < h and d_ground < self.zbuffer[x][y]:
+                if y < h and d_ground < self.zbuffer[x+y*self.pixwidth]:
                     camera_plane_ray = (x / self.pixwidth - 0.5) * 2 * self.camera_plane
                     ray = self.player_position + d_ground*(self.player_direction + camera_plane_ray)
                     # we use the fact that the ceiling and floor are mirrored
@@ -255,18 +256,12 @@ class Raycaster:
                                 self.set_pixel(x, y+ceiling_above_sprite_square,
                                                sprite_perpendicular_distance, brightness, tc)
 
-    def clear_zbuffer(self) -> None:
-        infinity = float("inf")
-        for x in range(self.pixwidth):
-            for y in range(self.pixheight):
-                self.zbuffer[x][y] = infinity
-
     def set_pixel(self, x: int, y: int, z: float, brightness: float, rgba: Optional[Tuple[int, int, int, int]]) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
         If rgba is None, the pixel is transparent instead of having a color."""
-        if rgba and z < self.zbuffer[x][y]:
-            self.zbuffer[x][y] = z
+        if rgba and z < self.zbuffer[x+y*self.pixwidth]:
+            self.zbuffer[x+y*self.pixwidth] = z
             if z > 0 and brightness != 1.0:
                 rgba = self.color_brightness(rgba, brightness)
             self.image_buf[x, y] = rgba
