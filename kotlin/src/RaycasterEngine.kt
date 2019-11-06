@@ -5,6 +5,8 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.lang.Math.toRadians
 import java.util.Arrays
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 import kotlin.NoSuchElementException
 import kotlin.math.*
 import kotlin.system.measureTimeMillis
@@ -41,7 +43,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     var cameraPlane = Vec2d(tan(HVOF / 2.0), 0.0)
     private var frame = 0
     private val ceilingSizes = IntArray(pixwidth)
-    private val zbuffer = DoubleArray(pixwidth*pixheight)
+    private val zbuffer = DoubleArray(pixwidth * pixheight)
     private val textures = mapOf(
             "test" to Texture.fromFile("python/pyraycaster/textures/test.png"),
             "floor" to Texture.fromFile("python/pyraycaster/textures/floor.png"),
@@ -61,28 +63,36 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     val renderTimes: RenderTimes
         get() = RenderTimes(durationWallsMs, durationCeilingFloorMs, durationSpritesMs)
 
+    private val numRenderThreads = Runtime.getRuntime().availableProcessors() / 2
+    private val renderThreadpool = Executors.newFixedThreadPool(numRenderThreads)
+
     fun tick(timer: Long) {
         frame++
         Arrays.fill(zbuffer, Double.POSITIVE_INFINITY)      // clear the z-buffer
         val scrDist = screenDistance()
 
         durationWallsMs = measureTimeMillis {
-            // cast a ray per pixel column on the screen!
+            // Cast a ray per pixel column on the screen!
             // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
-            // TODO multi threaded?
-            for (x in 0 until pixwidth) {
-                val castResult = castRay(x)
-                if (castResult.distance > 0) {
-                    val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
-                    ceilingSizes[x] = ceilingSize
-                    if (castResult.squareContents > 0)
-                        drawColumn(x, ceilingSize, castResult.distance,
-                                wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
-                    else
-                        drawBlackColumn(x, ceilingSize, castResult.distance)
-                } else
-                    ceilingSizes[x] = 0
+            // Chunks of columns are calculated in different threads.
+            val workers = (0 until pixwidth).chunked(pixwidth / numRenderThreads + 1).map { columns ->
+                Callable {
+                    for (x in columns) {
+                        val castResult = castRay(x)
+                        if (castResult.distance > 0) {
+                            val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
+                            ceilingSizes[x] = ceilingSize
+                            if (castResult.squareContents > 0)
+                                drawColumn(x, ceilingSize, castResult.distance,
+                                        wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
+                            else
+                                drawBlackColumn(x, ceilingSize, castResult.distance)
+                        } else
+                            ceilingSizes[x] = 0
+                    }
+                }
             }
+            renderThreadpool.invokeAll(workers)
         }
 
         durationCeilingFloorMs = measureTimeMillis {
@@ -101,17 +111,17 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         //      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
         //      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
         //      That also makes the intersection test a lot simpler!?
-        val cameraPlaneRay = cameraPlane * ( ((pixelX fdiv pixwidth) - 0.5) * 2.0)
+        val cameraPlaneRay = cameraPlane * (((pixelX fdiv pixwidth) - 0.5) * 2.0)
         val castRay = playerDirection + cameraPlaneRay
         val stepSize = 0.02   // lower this to increase ray resolution
         val rayStep = castRay * stepSize
         var ray = playerPosition
         var distance = 0.0     // distance perpendicular to the camera view plane
-        while(distance <= BLACK_DISTANCE) {
+        while (distance <= BLACK_DISTANCE) {
             distance += stepSize
             ray += rayStep
             val square = mapSquare(ray.x, ray.y)
-            if(square>0) {
+            if (square > 0) {
                 val (side, tx, _) = intersectionWithMapsquareAccurate(playerPosition, ray)
                 // XXX tx = intersection_with_mapsquare_fast (ray)
                 return RayCastResult(square, side, distance, tx)
@@ -141,9 +151,9 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         val intersects: Intersection
         val direction = cast_ray - camera
         val squareCenter = Vec2d(cast_ray.x.toInt() + 0.5, cast_ray.y.toInt() + 0.5)
-        if(camera.x < squareCenter.x) {
+        if (camera.x < squareCenter.x) {
             // left half of square
-            intersects = if(camera.y < squareCenter.y) {
+            intersects = if (camera.y < squareCenter.y) {
                 val vertexAngle = ((squareCenter + Vec2d(-0.5, -0.5)) - camera).angle()
                 if (direction.angle() < vertexAngle) Intersection.Bottom else Intersection.Left
             } else {
@@ -152,16 +162,16 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             }
         } else {
             // right half of square (need to flip some X's because of angle sign issue)
-            if(camera.y < squareCenter.y) {
+            if (camera.y < squareCenter.y) {
                 val vertex = ((squareCenter + Vec2d(0.5, -0.5)) - camera)
                 vertex.x = -vertex.x
                 val posDir = Vec2d(-direction.x, direction.y)
-                intersects = if(posDir.angle() < vertex.angle()) Intersection.Bottom else Intersection.Right
+                intersects = if (posDir.angle() < vertex.angle()) Intersection.Bottom else Intersection.Right
             } else {
                 val vertex = ((squareCenter + Vec2d(0.5, 0.5)) - camera)
                 vertex.x = -vertex.x
                 val posDir = Vec2d(-direction.x, direction.y)
-                intersects = if(posDir.angle() < vertex.angle()) Intersection.Right else Intersection.Top
+                intersects = if (posDir.angle() < vertex.angle()) Intersection.Right else Intersection.Top
             }
         }
         // now calculate the exact x (and y) coordinates of the intersection with the square's edge
@@ -217,6 +227,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     }
 
     private fun drawFloorAndCeiling(ceilingSizes: IntArray, screenDistance: Double) {
+        // TODO make this multi threaded; this is the most cpu intensive part of the screen rendering
+
         val mcs = ceilingSizes.max()
         if (mcs == null || mcs <= 0)
             return
@@ -227,8 +239,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val sy = 0.5 - (y fdiv pixheight)
             val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
             val brightness = brightness(groundDistance)
-            for(x in 0 until pixwidth) {
-                if (y < ceilingSizes[x] && groundDistance < zbuffer[x+y*pixwidth]) {
+            for (x in 0 until pixwidth) {
+                if (y < ceilingSizes[x] && groundDistance < zbuffer[x + y * pixwidth]) {
                     val cameraPlaneRay = cameraPlane * (((x fdiv pixwidth) - 0.5) * 2.0)
                     val ray = playerPosition + (playerDirection + cameraPlaneRay) * groundDistance
                     // we use the fact that the ceiling and floor are mirrored
@@ -240,53 +252,57 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     }
 
     private fun drawSprites(d_screen: Double) {
-        map.sprites.forEach {
-            val (mx, my) = it.key
-            val mc = it.value
-            val spritePos = Vec2d(mx + 0.5, my + 0.5)
-            val spriteVec = spritePos - playerPosition
-            val spriteDirection = spriteVec.angle()
-            val spriteDistance = spriteVec.magnitude()
-            var spriteViewAngle = playerDirection.angle() - spriteDirection
-            if(spriteViewAngle < -PI)
-                spriteViewAngle += 2.0*PI
-            else if(spriteViewAngle > PI)
-                spriteViewAngle -= 2.0*PI
-            if(spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF/2.0) {
-                val spriteSize: Double
-                val texture: Texture
-                when (mc) {
-                    'g' -> {
-                        texture = textures.getValue("creature-gargoyle")
-                        spriteSize = 0.8
-                    }
-                    'h' -> {
-                        texture = textures.getValue("creature-hero")
-                        spriteSize = 0.7
-                    }
-                    't' -> {
-                        texture = textures.getValue("treasure")
-                        spriteSize = 0.6
-                    }
-                    else -> throw NoSuchElementException("unknown sprite: $mc")
+        // every sprite is drawn as its own render worker
+        val workers = map.sprites.map { Callable { drawSprite(it, d_screen) }}
+        renderThreadpool.invokeAll(workers)
+    }
+
+    private fun drawSprite(sprite: Map.Entry<Pair<Int, Int>, Char>, d_screen: Double) {
+        val (mx, my) = sprite.key
+        val mc = sprite.value
+        val spritePos = Vec2d(mx + 0.5, my + 0.5)
+        val spriteVec = spritePos - playerPosition
+        val spriteDirection = spriteVec.angle()
+        val spriteDistance = spriteVec.magnitude()
+        var spriteViewAngle = playerDirection.angle() - spriteDirection
+        if (spriteViewAngle < -PI)
+            spriteViewAngle += 2.0 * PI
+        else if (spriteViewAngle > PI)
+            spriteViewAngle -= 2.0 * PI
+        if (spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF / 2.0) {
+            val spriteSize: Double
+            val texture: Texture
+            when (mc) {
+                'g' -> {
+                    texture = textures.getValue("creature-gargoyle")
+                    spriteSize = 0.8
                 }
-                val middlePixelColumn = ((0.5*(spriteViewAngle/(HVOF/2.0))+0.5) * pixwidth).toInt()
-                val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
-                var ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
-                if(ceilingAboveSpriteSquare >= 0) {  // TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
-                    val brightness = brightness(spritePerpendicularDistance)
-                    var pixelHeight = pixheight - ceilingAboveSpriteSquare*2
-                    val y_offset = ((1.0-spriteSize) * pixelHeight).toInt()
-                    ceilingAboveSpriteSquare += y_offset
-                    pixelHeight = (spriteSize * pixelHeight).toInt()
-                    val pixelWidth = pixelHeight
-                    for(y in 0 until pixelHeight) {
-                        for(x in max(0, middlePixelColumn - pixelWidth/2)
-                                until min(pixwidth, middlePixelColumn + pixelWidth/2)) {
-                            val tc = texture.sample(((x-middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
-                            if((tc ushr 24) > 200)   // consider alpha channel
-                                setPixel(x, y + ceilingAboveSpriteSquare, spritePerpendicularDistance, brightness, tc)
-                        }
+                'h' -> {
+                    texture = textures.getValue("creature-hero")
+                    spriteSize = 0.7
+                }
+                't' -> {
+                    texture = textures.getValue("treasure")
+                    spriteSize = 0.6
+                }
+                else -> throw NoSuchElementException("unknown sprite: $mc")
+            }
+            val middlePixelColumn = ((0.5 * (spriteViewAngle / (HVOF / 2.0)) + 0.5) * pixwidth).toInt()
+            val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
+            var ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
+            if (ceilingAboveSpriteSquare >= 0) {  // TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
+                val brightness = brightness(spritePerpendicularDistance)
+                var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2
+                val y_offset = ((1.0 - spriteSize) * pixelHeight).toInt()
+                ceilingAboveSpriteSquare += y_offset
+                pixelHeight = (spriteSize * pixelHeight).toInt()
+                val pixelWidth = pixelHeight
+                for (y in 0 until pixelHeight) {
+                    for (x in max(0, middlePixelColumn - pixelWidth / 2)
+                            until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
+                        val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
+                        if ((tc ushr 24) > 200)   // consider alpha channel
+                            setPixel(x, y + ceilingAboveSpriteSquare, spritePerpendicularDistance, brightness, tc)
                     }
                 }
             }

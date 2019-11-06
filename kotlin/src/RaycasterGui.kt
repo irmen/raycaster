@@ -15,8 +15,8 @@ import kotlin.math.min
 
 class RaycasterGui {
     companion object {
-        const val PIXEL_WIDTH = 768
-        const val PIXEL_HEIGHT = 480
+        const val PIXEL_WIDTH = 800
+        const val PIXEL_HEIGHT = 500
         const val PIXEL_SCALE = 2
     }
 
