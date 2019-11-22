@@ -24,7 +24,12 @@ class RaycasterGui {
     private val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
     private val minimap = MinimapCanvas(engine.map, 3)
     private val window = Window("Kotlin Raycaster", minimap, image, engine)
-    private val desiredRefreshRate = max(30L, min(150L, GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate.toLong()))
+    private val desiredRefreshRate: Int by lazy {
+        var defaultRefreshRate = GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate
+        if(defaultRefreshRate==0)
+            defaultRefreshRate = GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.map { it.displayMode.refreshRate }.first { it>0 }
+        max(30, min(150, defaultRefreshRate))
+    }
 
     init {
         val gameThread = Thread {
