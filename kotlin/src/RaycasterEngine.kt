@@ -4,7 +4,7 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.lang.Math.toRadians
-import java.util.Arrays
+import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import kotlin.NoSuchElementException
@@ -259,7 +259,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
 
     private fun drawSprites(d_screen: Double) {
         // every sprite is drawn as its own render worker
-        val workers = map.sprites.map { Callable { drawSprite(it, d_screen) }}
+        val workers = map.sprites.map { Callable { drawSprite(it, d_screen) } }
         renderThreadpool.invokeAll(workers)
     }
 
@@ -323,8 +323,8 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
      * If argb is None, the pixel is transparent instead of having a color.
      */
     private fun setPixel(x: Int, y: Int, z: Double, brightness: Double, argb: Int?) {
-        val pixelOffset = x+y*pixwidth
-        if (argb!=null && z < zbuffer[pixelOffset]) {
+        val pixelOffset = x + y * pixwidth
+        if (argb != null && z < zbuffer[pixelOffset]) {
             zbuffer[pixelOffset] = z
             if (z > 0 && brightness != 1.0) {
                 pixels[pixelOffset] = colorBrightness(argb, brightness)
@@ -372,16 +372,16 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     }
 
     private fun movePlayer(x: Double, y: Double) {
-        if(mapSquare(x, y) == 0) {
+        if (mapSquare(x, y) == 0) {
             playerPosition = Vec2d(x, y)
             // stay a certain minimum distance from the walls
-            if(mapSquare(x + 0.1, y)>0)
+            if (mapSquare(x + 0.1, y) > 0)
                 playerPosition.x = x.toInt() + 0.9
-            if(mapSquare(x - 0.1, y)>0)
+            if (mapSquare(x - 0.1, y) > 0)
                 playerPosition.x = x.toInt() + 0.1
-            if(mapSquare(x, y + 0.1)>0)
+            if (mapSquare(x, y + 0.1) > 0)
                 playerPosition.y = y.toInt() + 0.9
-            if(mapSquare(x, y - 0.1)>0)
+            if (mapSquare(x, y - 0.1) > 0)
                 playerPosition.y = y.toInt() + 0.1
         }
     }
