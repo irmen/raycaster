@@ -45,14 +45,14 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
     private val ceilingSizes = IntArray(pixwidth)
     private val zbuffer = DoubleArray(pixwidth * pixheight)
     private val textures = mapOf(
-            "test" to Texture.fromFile("python/pyraycaster/textures/test.png"),
-            "floor" to Texture.fromFile("python/pyraycaster/textures/floor.png"),
-            "ceiling" to Texture.fromFile("python/pyraycaster/textures/ceiling.png"),
-            "wall-bricks" to Texture.fromFile("python/pyraycaster/textures/wall-bricks.png"),
-            "wall-stone" to Texture.fromFile("python/pyraycaster/textures/wall-stone.png"),
-            "creature-gargoyle" to Texture.fromFile("python/pyraycaster/textures/gargoyle.png"),
-            "creature-hero" to Texture.fromFile("python/pyraycaster/textures/legohero.png"),
-            "treasure" to Texture.fromFile("python/pyraycaster/textures/treasure.png")
+            "test" to Texture.fromFile("resources/textures/test.png"),
+            "floor" to Texture.fromFile("resources/textures/floor.png"),
+            "ceiling" to Texture.fromFile("resources/textures/ceiling.png"),
+            "wall-bricks" to Texture.fromFile("resources/textures/wall-bricks.png"),
+            "wall-stone" to Texture.fromFile("resources/textures/wall-stone.png"),
+            "creature-gargoyle" to Texture.fromFile("resources/textures/gargoyle.png"),
+            "creature-hero" to Texture.fromFile("resources/textures/legohero.png"),
+            "treasure" to Texture.fromFile("resources/textures/treasure.png")
     )
     private val wallTextures = listOf(textures["test"], textures["wall-bricks"], textures["wall-stone"])
 
