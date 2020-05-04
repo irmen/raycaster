@@ -68,7 +68,17 @@ class RaycasterWindow(tkinter.Tk):
         super().__init__()
         self.perf_timestamp = time.monotonic()
         self.time_msec_epoch = int(time.monotonic() * 1000)
-        self.raycaster = Raycaster(self.PIXEL_WIDTH, self.PIXEL_HEIGHT)
+        dungeon_map = Map(["11111111111111111111",
+                           "1..................1",
+                           "1..111111222222.2221",
+                           "1.....1.....2.....t1",
+                           "1.g...1.gh..2..h...1",
+                           "1...111t....2222...1",
+                           "1....t1222..2......1",
+                           "1....g.222..2.1.2.11",
+                           "1.h.......s........1",
+                           "11111111111111111111"])
+        self.raycaster = Raycaster(self.PIXEL_WIDTH, self.PIXEL_HEIGHT, dungeon_map)
         self.imageTk = None
         self.resizable(0, 0)
         self.configure(borderwidth=self.PIXEL_SCALE, background="black")
@@ -77,7 +87,7 @@ class RaycasterWindow(tkinter.Tk):
         self.init_gui_image()
         self.label.pack()
         bottomframe = tkinter.Frame(self)
-        self.minimap = Minimap(bottomframe, self.raycaster.map)
+        self.minimap = Minimap(bottomframe, dungeon_map)
         self.minimap.pack(side=tkinter.LEFT)
         self.minimap.move_player(self.raycaster.player_position, self.raycaster.player_direction,
                                  self.raycaster.camera_plane)

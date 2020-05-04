@@ -123,7 +123,6 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val square = mapSquare(ray.x, ray.y)
             if (square > 0) {
                 val (side, tx, _) = intersectionWithMapsquareAccurate(playerPosition, ray)
-                // XXX tx = intersection_with_mapsquare_fast (ray)
                 return RayCastResult(square, side, distance, tx)
             }
         }

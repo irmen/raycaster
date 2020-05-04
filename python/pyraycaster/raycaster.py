@@ -7,15 +7,15 @@ from .mapstuff import Map, Texture, Intersection
 
 # Micro Optimization ideas:
 #
-# - get rid of the Vector class and inline trig functions instead.
-#   (but that results in code that is less easier to understand)
+# - get rid of the Vector class and inline the trig functions instead.
+#   (but that results in code that is harder to understand)
 
 
 class Raycaster:
     HVOF = radians(80)
     BLACK_DISTANCE = 4.0
 
-    def __init__(self, pixwidth: int, pixheight: int) -> None:
+    def __init__(self, pixwidth: int, pixheight: int, dungeon_map: Map) -> None:
         self.pixwidth = pixwidth
         self.pixheight = pixheight
         self.empty_zbuffer = [float("inf")] * pixheight * pixwidth
@@ -38,16 +38,7 @@ class Raycaster:
         self.player_position = Vec2(0, 0)
         self.player_direction = Vec2(0, 1)
         self.camera_plane = Vec2(tan(self.HVOF / 2), 0)
-        self.map = Map(["11111111111111111111",
-                        "1..................1",
-                        "1..111111222222.2221",
-                        "1.....1.....2.....t1",
-                        "1.g...1.gh..2..h...1",
-                        "1...111t....2222...1",
-                        "1....t1222..2......1",
-                        "1....g.222..2.1.2.11",
-                        "1.h.......s........1",
-                        "11111111111111111111"])
+        self.map = dungeon_map
         self.player_position = Vec2(self.map.player_start[0]+0.5, self.map.player_start[1]+0.5)
 
     def tick(self, walltime_msec: float) -> None:
@@ -89,33 +80,8 @@ class Raycaster:
             square = self.map_square(ray.x, ray.y)
             if square:
                 side, tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
-                # XXX tx = self.intersection_with_mapsquare_fast(ray)
                 return square, distance, tx, side
         return -1, distance, 0.0, Intersection.TOP
-
-    def intersection_with_mapsquare_fast(self, cast_ray: Vec2) -> float:
-        """Cast_ray is the ray that we know intersects with a square.
-        This method returns only the needed wall texture sample coordinate."""
-        # Note: this method is rather fast, but is inaccurate.
-        # When the ray intersects near a corner of the square, sometimes the wrong edge is determined.
-        # Also, the texture sample coordinate is directly taken from the cast ray,
-        # instead of the actual intersection point.
-        square_center = Vec2(int(cast_ray.x) + 0.5, int(cast_ray.y) + 0.5)
-        angle = (cast_ray - square_center).angle()
-        # consider the angle (which gives the quadrant in the map square) rotated by pi/4
-        # to find the edge of the square it intersects with
-        if -pi*.25 <= angle < pi*.25:
-            # right edge
-            return cast_ray.y
-        elif pi*.25 <= angle < pi*.75:
-            # top edge
-            return -cast_ray.x
-        elif -pi*.75 <= angle < -pi*.25:
-            # bottom edge
-            return cast_ray.x
-        else:
-            # left edge
-            return -cast_ray.y
 
     def intersection_with_mapsquare_accurate(self, camera: Vec2, cast_ray: Vec2) -> Tuple[Intersection, float, Vec2]:
         """Cast_ray is the ray that we know intersects with a square.

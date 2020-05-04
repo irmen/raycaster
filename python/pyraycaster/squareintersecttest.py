@@ -4,6 +4,7 @@
 import tkinter
 from .vector import Vec2
 from .raycaster import Raycaster
+from .mapstuff import Map
 from typing import Tuple
 
 width = 3.0
@@ -19,7 +20,7 @@ class Window(tkinter.Tk):
         lb = tkinter.Label(self, text="click to set camera, move mouse to cast view ray\n"
                                       "Note: all squares are 1x1 units and occur on integer coordinates")
         lb.pack()
-        self.raycaster = Raycaster(10, 10)
+        self.raycaster = Raycaster(10, 10, Map([""]))
         self.canvas = tkinter.Canvas(self, width=width*screen_scale, height=height*screen_scale)
         rx1, ry1 = self.to_screen(square_origin.x, square_origin.y)
         rx2, ry2 = self.to_screen(square_origin.x+1, square_origin.y+1)
@@ -102,12 +103,7 @@ def bench():
     for _ in range(100000):
         r.intersection_with_mapsquare_accurate(camera, cast_ray)
     duration = time.perf_counter() - begin
-    print(f"original accurate took: {duration:.2f} sec")
-    begin = time.perf_counter()
-    for _ in range(100000):
-        r.intersection_with_mapsquare_fast(cast_ray)
-    duration = time.perf_counter() - begin
-    print(f"new took: {duration:.2f} sec")
+    print(f"took: {duration:.2f} sec")
 
 
 interactive()
