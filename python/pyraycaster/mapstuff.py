@@ -2,14 +2,6 @@ import io
 import pkgutil
 from PIL import Image
 from typing import Union, List, Dict, Tuple, BinaryIO
-from enum import Enum
-
-
-class Intersection(Enum):
-    TOP = 1
-    RIGHT = 2
-    BOTTOM = 3
-    LEFT = 4
 
 
 class Texture:

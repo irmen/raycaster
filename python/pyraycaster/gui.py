@@ -61,8 +61,8 @@ class Minimap(tkinter.Canvas):
 
 class RaycasterWindow(tkinter.Tk):
     PIXEL_SCALE = 5
-    PIXEL_WIDTH = 160
-    PIXEL_HEIGHT = 100
+    PIXEL_WIDTH = 200
+    PIXEL_HEIGHT = 120
 
     def __init__(self):
         super().__init__()

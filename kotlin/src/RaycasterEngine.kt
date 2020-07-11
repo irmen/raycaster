@@ -20,7 +20,7 @@ class RenderTimes(val wallsMs: Long, val ceilingAndFloorMs: Long, val spritesMs:
 
 class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, image: BufferedImage) {
     var HVOF = toRadians(80.0)
-    var BLACK_DISTANCE = 4.0
+    var BLACK_DISTANCE = 4.5
     val USE_MULTITHREADED_RENDERING = true
 
     // instead of drawing pixels on the image using setRGB, we manipulate the pixel buffer directly:
@@ -111,6 +111,96 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
 
     private class RayCastResult(val squareContents: Int, val side: Intersection, val distance: Double, val textureX: Double)
 
+    private fun castRayDDA(pixelX: Int): RayCastResult {
+        // from: https://lodev.org/cgtutor/raycasting.html
+
+        // TODO optimize variables
+        val planeX = cameraPlane.x
+        val planeY = cameraPlane.y
+        val dirX = playerDirection.x
+        val dirY = playerDirection.y
+        val posX = playerPosition.x
+        val posY = playerPosition.y
+
+        //calculate ray position and direction
+        val cameraX = 2.0 * pixelX / pixwidth - 1.0; //x-coordinate in camera space
+
+        val rayDirX = dirX + planeX*cameraX;
+        val rayDirY = dirY + planeY*cameraX;
+
+        //which box of the map we're in
+        var mapX = playerPosition.x.toInt()
+        var mapY = playerPosition.y.toInt()
+
+        //length of ray from current position to next x or y-side
+        var sideDistX: Double
+        var sideDistY: Double
+
+        //length of ray from one x or y-side to next x or y-side
+        val deltaDistX = abs(1.0 / rayDirX)
+        val  deltaDistY = abs(1.0 / rayDirY)
+
+        //what direction to step in x or y-direction (either +1 or -1)
+        val stepX: Int
+        val stepY: Int
+
+        var hit = false    //was there a wall hit?
+        var side = false   //was a NS or a EW wall hit?
+
+        //calculate step and initial sideDist
+        if(rayDirX < 0)
+        {
+            stepX = -1
+            sideDistX = (posX - mapX) * deltaDistX
+        }
+        else
+        {
+            stepX = 1
+            sideDistX = (mapX + 1.0 - posX) * deltaDistX
+        }
+        if(rayDirY < 0)
+        {
+            stepY = -1
+            sideDistY = (posY - mapY) * deltaDistY
+        }
+        else
+        {
+            stepY = 1
+            sideDistY = (mapY + 1.0 - posY) * deltaDistY
+        }
+
+        //perform DDA
+        while (!hit)
+        {
+            //jump to next map square, OR in x-direction, OR in y-direction
+            if(sideDistX < sideDistY)
+            {
+                sideDistX += deltaDistX
+                mapX += stepX
+                side = false
+            }
+            else
+            {
+                sideDistY += deltaDistY
+                mapY += stepY
+                side = true
+            }
+            //Check if ray has hit a wall
+            hit = map.getWall(mapX, mapY) != 0
+        }
+
+        //Calculate distance of perpendicular ray (Euclidean distance will give fisheye effect!)
+        val perpWallDist =
+                if (side)
+                    (mapY - posY + (1 - stepY) / 2) / rayDirY
+                else
+                    (mapX - posX + (1 - stepX) / 2) / rayDirX
+
+        val textureX = 0.0        // TODO
+
+        return RayCastResult(map.getWall(mapX, mapY), if(side) Intersection.Bottom else Intersection.Left, perpWallDist, textureX)
+    }
+
     private fun castRay(pixelX: Int): RayCastResult {
         // TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
         //      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
@@ -118,7 +208,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         //      That also makes the intersection test a lot simpler!?
         val cameraPlaneRay = cameraPlane * (((pixelX fdiv pixwidth) - 0.5) * 2.0)
         val castRay = playerDirection + cameraPlaneRay
-        val stepSize = 0.02   // lower this to increase ray resolution
+        val stepSize = 0.005   // decrease this to increase ray resolution
         val rayStep = castRay * stepSize
         var ray = playerPosition
         var distance = 0.0     // distance perpendicular to the camera view plane

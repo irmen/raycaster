@@ -2,7 +2,7 @@ from math import pi, tan, radians, cos
 from typing import Tuple, List, Optional
 from PIL import Image
 from .vector import Vec2
-from .mapstuff import Map, Texture, Intersection
+from .mapstuff import Map, Texture
 
 
 # Micro Optimization ideas:
@@ -13,7 +13,7 @@ from .mapstuff import Map, Texture, Intersection
 
 class Raycaster:
     HVOF = radians(80)
-    BLACK_DISTANCE = 4.0
+    BLACK_DISTANCE = 4.5
 
     def __init__(self, pixwidth: int, pixheight: int, dungeon_map: Map) -> None:
         self.pixwidth = pixwidth
@@ -50,12 +50,12 @@ class Raycaster:
         #       multiprocessing is probably not useful because of IPC overhead to sync the world state...
         d_screen = self.screen_distance()
         for x in range(self.pixwidth):
-            wall, distance, texture_x, side = self.cast_ray(x)
+            wall, distance, texture_x = self.cast_ray_dda(x)
             if distance > 0:
                 ceiling_size = int(self.pixheight * (1.0 - d_screen / distance) / 2.0)
                 self.ceiling_sizes[x] = ceiling_size
                 if wall > 0:
-                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x, side)
+                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x)
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
             else:
@@ -63,96 +63,72 @@ class Raycaster:
         self.draw_floor_and_ceiling(self.ceiling_sizes, d_screen)
         self.draw_sprites(d_screen)
 
-    def cast_ray(self, pixel_x: int) -> Tuple[int, float, float, Intersection]:
-        # TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
-        #      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
-        #      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
-        #      That also makes the intersection test a lot simpler!?
-        camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
-        cast_ray = self.player_direction + camera_plane_ray
-        distance = 0.0     # distance perpendicular to the camera view plane
-        step_size = 0.02   # lower this to increase ray resolution
-        ray = self.player_position
-        ray_step = cast_ray * step_size
-        while distance <= self.BLACK_DISTANCE:
-            distance += step_size
-            ray += ray_step
-            square = self.map_square(ray.x, ray.y)
-            if square:
-                side, tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
-                return square, distance, tx, side
-        return -1, distance, 0.0, Intersection.TOP
+    def cast_ray_dda(self, pixel_x: int) -> Tuple[int, float, float]:
+        # code adapted from: https://lodev.org/cgtutor/raycasting.html
 
-    def cast_ray_iter(self, pixel_x: int) -> Tuple[List[Vec2], int, float, float, Intersection]:
-        # TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
-        #      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
-        #      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
-        #      That also makes the intersection test a lot simpler!?
-        points = []
-        camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
-        cast_ray = self.player_direction + camera_plane_ray
-        distance = 0.0     # distance perpendicular to the camera view plane
-        step_size = 0.02   # lower this to increase ray resolution
-        ray = self.player_position
-        ray_step = cast_ray * step_size
-        while distance <= self.BLACK_DISTANCE:
-            distance += step_size
-            ray += ray_step
-            square = self.map_square(ray.x, ray.y)
-            points.append(ray)
-            if square:
-                side, tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
-                return points, square, distance, tx, side
-        return points, -1, distance, 0.0, Intersection.TOP
+        # calculate ray position and direction
+        cameraX = 2.0 * pixel_x / self.pixwidth - 1.0   # x-coordinate in camera space
+        ray = self.player_direction + self.camera_plane * cameraX
 
-    def intersection_with_mapsquare_accurate(self, camera: Vec2, cast_ray: Vec2) -> Tuple[Intersection, float, Vec2]:
-        """Cast_ray is the ray that we know intersects with a square.
-        This method returns (side, wall texture sample coordinate, Vec2(intersect x, intersect y))."""
-        # Note: this method is a bit slow, but very accurate.
-        # It always determines the correct quadrant/edge that is intersected,
-        # and calculates the texture sample coordinate based off the actual intersection point
-        # of the cast camera ray with that square's edge.
-        # We now first determine what quadrant of the square the camera is looking at,
-        # and based on the relative angle with the vertex, what edge of the square.
-        direction = cast_ray - camera
-        square_center = Vec2(int(cast_ray.x) + 0.5, int(cast_ray.y) + 0.5)
-        if camera.x < square_center.x:
-            # left half of square
-            if camera.y < square_center.y:
-                vertex_angle = ((square_center + Vec2(-0.5, -0.5)) - camera).angle()
-                intersects = Intersection.BOTTOM if direction.angle() < vertex_angle else Intersection.LEFT
-            else:
-                vertex_angle = ((square_center + Vec2(-0.5, 0.5)) - camera).angle()
-                intersects = Intersection.LEFT if direction.angle() < vertex_angle else Intersection.TOP
+        # which box of the map we're in
+        mapX = int(self.player_position.x)
+        mapY = int(self.player_position.y)
+
+        # length of ray from one x or y-side to next x or y-side
+        deltaDistX = abs(1 / ray.x) if ray.x else float("inf")
+        deltaDistY = abs(1 / ray.y) if ray.y else float("inf")
+
+        side = False  # was a NS or a EW wall hit?
+
+        # calculate step and initial sideDist
+        # stepX,Y = what direction to step in x or y-direction (either +1 or -1)
+        # sideDistX,Y = length of ray from current position to next x or y-side
+        if ray.x < 0:
+            stepX = -1
+            sideDistX = (self.player_position.x - mapX) * deltaDistX
         else:
-            # right half of square (need to flip some X's because of angle sign issue)
-            if camera.y < square_center.y:
-                vertex = ((square_center + Vec2(0.5, -0.5)) - camera)
-                vertex.x = -vertex.x
-                positive_dir = Vec2(-direction.x, direction.y)
-                intersects = Intersection.BOTTOM if positive_dir.angle() < vertex.angle() else Intersection.RIGHT
+            stepX = 1
+            sideDistX = (mapX + 1.0 - self.player_position.x) * deltaDistX
+
+        if ray.y < 0:
+            stepY = -1
+            sideDistY = (self.player_position.y - mapY) * deltaDistY
+        else:
+            stepY = 1
+            sideDistY = (mapY + 1.0 - self.player_position.y) * deltaDistY
+
+        # perform DDA
+        wall = 0
+        while wall==0:
+            # jump to next map square, OR in x-direction, OR in y-direction
+            if sideDistX < sideDistY:
+                sideDistX += deltaDistX
+                mapX += stepX
+                side = False
             else:
-                vertex = ((square_center + Vec2(0.5, 0.5)) - camera)
-                vertex.x = -vertex.x
-                positive_dir = Vec2(-direction.x, direction.y)
-                intersects = Intersection.RIGHT if positive_dir.angle() < vertex.angle() else Intersection.TOP
-        # now calculate the exact x (and y) coordinates of the intersection with the square's edge
-        if intersects == Intersection.TOP:
-            iy = square_center.y + 0.5
-            ix = 0.0 if direction.y == 0 else camera.x + (iy - camera.y) * direction.x / direction.y
-            return intersects, -ix, Vec2(ix, iy)
-        elif intersects == Intersection.BOTTOM:
-            iy = square_center.y - 0.5
-            ix = 0.0 if direction.y == 0 else camera.x + (iy - camera.y) * direction.x / direction.y
-            return intersects, ix, Vec2(ix, iy)
-        elif intersects == Intersection.LEFT:
-            ix = square_center.x - 0.5
-            iy = 0.0 if direction.x == 0 else camera.y + (ix - camera.x) * direction.y / direction.x
-            return intersects, -iy, Vec2(ix, iy)
-        else:   # right edge
-            ix = square_center.x + 0.5
-            iy = 0.0 if direction.x == 0 else camera.y + (ix - camera.x) * direction.y / direction.x
-            return intersects, iy, Vec2(ix, iy)
+                sideDistY += deltaDistY
+                mapY += stepY
+                side = True
+
+            # Check if ray has hit a wall
+            wall = self.map.get_wall(mapX, mapY)
+
+        # Calculate distance of perpendicular ray (Euclidean distance will give fisheye effect!)
+        if side:
+            distance = (mapY - self.player_position.y + (1 - stepY) / 2) / ray.y
+        else:
+            distance = (mapX - self.player_position.x + (1 - stepX) / 2) / ray.x
+
+        if 0 < distance < self.BLACK_DISTANCE:
+            # calculate texture X of wall (0.0 - 1.0)
+            if side:
+                wall_tex_x = self.player_position.x + distance * ray.x
+            else:
+                wall_tex_x = self.player_position.y + distance * ray.y
+            # wall_tex_x -= floor(wall_tex_x)
+            return wall, distance, wall_tex_x
+        else:
+            return -1, self.BLACK_DISTANCE, 0.0
 
     def map_square(self, x: float, y: float) -> int:
         mx = int(x)
@@ -165,14 +141,11 @@ class Raycaster:
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
     def draw_column(self, x: int, ceiling: int, distance: float,
-                    texture: Texture, tx: float, side: Intersection) -> None:
+                    texture: Texture, tx: float) -> None:
         start_y = max(0, ceiling)
         num_pixels = self.pixheight - 2*start_y
         wall_height = self.pixheight - 2*ceiling
-        brightness = self.brightness(distance)      # the whole column has the same brightness value
-        # if we wanted, a simple form of "sunlight" can be added here so that not all walls have the same brightness:
-        # if side in (Intersection.TOP, Intersection.RIGHT):      # make the sun 'shine' from bottom left
-        #     brightness *= 0.75
+        brightness = self.brightness(distance)
         for y in range(start_y, start_y+num_pixels):
             self.set_pixel(x, y, distance, brightness, texture.sample(tx, (y-ceiling) / wall_height))
 
