@@ -16,8 +16,8 @@ is to learn how to build a raycaster engine, and not to create an actual playabl
 *No 3d acceleration or third party graphics libraries are used.* 
 The program uses just built-in Tkinter for the GUI and display, and Pillow to load the textures 
 and provide a pixel image display.
-On my system (Ryzen 2700 cpu, Linux) I get 10-20 fps when using regular CPython 
-and around 60 fps when using Pypy!  This is with the default 160x100 resolution.
+On my system (Ryzen 2700 cpu, Linux) I get about 20 fps when using regular CPython 
+and around 60 fps when using Pypy!  This is with the default 200x120 render resolution.
 
 The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution.
 
@@ -26,12 +26,10 @@ The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution
 
 ## Todo
 
-- use a more efficient way to calculate the ray intersection with a map square
-- use a more efficient ray trace algorithm that 'steps over squares' instead of actually tracing the ray using tiny steps
 - sprite clipping instead of removal when they get to near
 - tweak the sprite z positioning a bit, they now appear 'too far to the back' of the square.
   This is because they're exactly in the middle while the sprite textures have a volumetric appearance.
-- make the camera height flexible (instead of sitting exactly in the middle)
+- make the camera height flexible (instead of sitting exactly in the middle) - head bob ? jumping?
 
 
 # World coordinate system
