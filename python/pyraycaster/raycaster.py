@@ -83,6 +83,28 @@ class Raycaster:
                 return square, distance, tx, side
         return -1, distance, 0.0, Intersection.TOP
 
+    def cast_ray_iter(self, pixel_x: int) -> Tuple[List[Vec2], int, float, float, Intersection]:
+        # TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
+        #      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
+        #      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
+        #      That also makes the intersection test a lot simpler!?
+        points = []
+        camera_plane_ray = (pixel_x / self.pixwidth - 0.5) * 2 * self.camera_plane
+        cast_ray = self.player_direction + camera_plane_ray
+        distance = 0.0     # distance perpendicular to the camera view plane
+        step_size = 0.02   # lower this to increase ray resolution
+        ray = self.player_position
+        ray_step = cast_ray * step_size
+        while distance <= self.BLACK_DISTANCE:
+            distance += step_size
+            ray += ray_step
+            square = self.map_square(ray.x, ray.y)
+            points.append(ray)
+            if square:
+                side, tx, _ = self.intersection_with_mapsquare_accurate(self.player_position, ray)
+                return points, square, distance, tx, side
+        return points, -1, distance, 0.0, Intersection.TOP
+
     def intersection_with_mapsquare_accurate(self, camera: Vec2, cast_ray: Vec2) -> Tuple[Intersection, float, Vec2]:
         """Cast_ray is the ray that we know intersects with a square.
         This method returns (side, wall texture sample coordinate, Vec2(intersect x, intersect y))."""

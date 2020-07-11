@@ -38,7 +38,7 @@ class RaycasterGui {
             var frame = 0L
             while(true) {
                 val curTime = System.currentTimeMillis()
-                if((curTime-lastTime) >= (1000/desiredRefreshRate)) {
+                if((curTime-lastTime) >= (1000/(desiredRefreshRate+1))) {
                     frame++
                     lastTime = curTime
                     tick(curTime-timeEpoch, frame)

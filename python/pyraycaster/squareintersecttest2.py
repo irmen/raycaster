@@ -29,6 +29,7 @@ class Window(tkinter.Tk):
                                       "Note: all squares are 1x1 units and occur on integer coordinates")
         lb.pack()
         self.raycaster = Raycaster(10, 10, dungeon_map)  # 'screen' pixels
+        self.raycaster.BLACK_DISTANCE = 4
         self.canvas = tkinter.Canvas(self, width=dungeon_map.width*screen_scale, height=dungeon_map.height*screen_scale)
         for x in range(dungeon_map.width):
             rx1, ry1 = self.to_screen(x, 0)
@@ -66,22 +67,29 @@ class Window(tkinter.Tk):
         self.camera.x, self.camera.y = self.from_screen(sx, sy)
         self.move_camera()
         self.direction = Vec2(0, 0)
+        self.raycaster.rotate_player_to(0)
         self.cast_rays()
 
     def mousemove(self, sx, sy):
         self.direction.x, self.direction.y = self.from_screen(sx, sy)
         self.direction -= self.camera
+        self.direction = self.direction.normalized()
+        self.raycaster.player_position = Vec2(self.camera.x, self.camera.y)
+        self.raycaster.rotate_player_to(self.direction.angle())
         self.cast_rays()
 
     def move_camera(self):
         sx, sy = self.to_screen(self.camera.x, self.camera.y)
         self.canvas.coords(self.cam_circle, sx-7, sy-7, sx+7, sy+7)
+        self.raycaster.player_position = Vec2(self.camera.x, self.camera.y)
 
     def cast_rays(self) -> None:
+        self.canvas.delete("cast_points")
         for px in range(self.raycaster.pixwidth):
-            wall, distance, texture_x, side = self.raycaster.cast_ray(px)
-            if wall > 0 and distance > 0:
-                print(wall, distance, texture_x, side)
+            points, wall, distance, texture_x, side = self.raycaster.cast_ray_iter(px)
+            for p in points:
+                sx, sy = self.to_screen(p.x, p.y)
+                self.canvas.create_rectangle(sx, sy, sx+4, sy+4, tag="cast_points")
 
 
 w = Window()
