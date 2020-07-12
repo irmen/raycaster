@@ -79,13 +79,13 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val workers = (0 until pixwidth).chunked(pixwidth / numRenderThreads + 1).map { columns ->
                 Callable {
                     for (x in columns) {
-                        val castResult = castRay(x)
+                        val castResult = castRayDDA(x)
                         if (castResult.distance > 0) {
                             val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
                             ceilingSizes[x] = ceilingSize
                             if (castResult.squareContents > 0)
                                 drawColumn(x, ceilingSize, castResult.distance,
-                                        wallTextures[castResult.squareContents]!!, castResult.textureX, castResult.side)
+                                        wallTextures[castResult.squareContents]!!, castResult.textureX)
                             else
                                 drawBlackColumn(x, ceilingSize, castResult.distance)
                         } else
@@ -109,187 +109,77 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         }
     }
 
-    private class RayCastResult(val squareContents: Int, val side: Intersection, val distance: Double, val textureX: Double)
+    private class RayCastResult(val squareContents: Int, val distance: Double, val textureX: Double)
 
     private fun castRayDDA(pixelX: Int): RayCastResult {
         // from: https://lodev.org/cgtutor/raycasting.html
 
-        // TODO optimize variables
-        val planeX = cameraPlane.x
-        val planeY = cameraPlane.y
-        val dirX = playerDirection.x
-        val dirY = playerDirection.y
-        val posX = playerPosition.x
-        val posY = playerPosition.y
+        // calculate ray position and direction
+        val cameraX = 2.0 * pixelX / pixwidth - 1.0   // x-coordinate in camera space
+        val ray = playerDirection + cameraPlane * cameraX
 
-        //calculate ray position and direction
-        val cameraX = 2.0 * pixelX / pixwidth - 1.0; //x-coordinate in camera space
-
-        val rayDirX = dirX + planeX*cameraX;
-        val rayDirY = dirY + planeY*cameraX;
-
-        //which box of the map we're in
+        // which box of the map we're in
         var mapX = playerPosition.x.toInt()
         var mapY = playerPosition.y.toInt()
 
-        //length of ray from current position to next x or y-side
-        var sideDistX: Double
-        var sideDistY: Double
+        // length of ray from one x or y-side to next x or y-side
+        val deltaDistX = abs(1.0 / ray.x)
+        val deltaDistY = abs(1.0 / ray.y)
 
-        //length of ray from one x or y-side to next x or y-side
-        val deltaDistX = abs(1.0 / rayDirX)
-        val  deltaDistY = abs(1.0 / rayDirY)
-
-        //what direction to step in x or y-direction (either +1 or -1)
+        var side = false  // was a NS or a EW wall hit?
+        // calculate step and initial sideDist
+        // stepX,Y = what direction to step in x or y-direction (either +1 or -1)
+        // sideDistX,Y = length of ray from current position to next x or y-side
         val stepX: Int
         val stepY: Int
-
-        var hit = false    //was there a wall hit?
-        var side = false   //was a NS or a EW wall hit?
-
-        //calculate step and initial sideDist
-        if(rayDirX < 0)
-        {
+        var sideDistX: Double
+        var sideDistY: Double
+        if(ray.x < 0) {
             stepX = -1
-            sideDistX = (posX - mapX) * deltaDistX
-        }
-        else
-        {
+            sideDistX = (playerPosition.x - mapX) * deltaDistX
+        } else {
             stepX = 1
-            sideDistX = (mapX + 1.0 - posX) * deltaDistX
-        }
-        if(rayDirY < 0)
-        {
-            stepY = -1
-            sideDistY = (posY - mapY) * deltaDistY
-        }
-        else
-        {
-            stepY = 1
-            sideDistY = (mapY + 1.0 - posY) * deltaDistY
+            sideDistX = (mapX + 1.0 - playerPosition.x) * deltaDistX
         }
 
-        //perform DDA
-        while (!hit)
-        {
-            //jump to next map square, OR in x-direction, OR in y-direction
-            if(sideDistX < sideDistY)
-            {
+        if(ray.y < 0) {
+            stepY = -1
+            sideDistY = (playerPosition.y - mapY) * deltaDistY
+        } else {
+            stepY = 1
+            sideDistY = (mapY + 1.0 - playerPosition.y) * deltaDistY
+        }
+
+        // perform DDA
+        var wall = 0
+        while(wall==0) {
+            // jump to next map square, OR in x-direction, OR in y-direction, until we hit a wall
+            if(sideDistX < sideDistY) {
                 sideDistX += deltaDistX
                 mapX += stepX
                 side = false
-            }
-            else
-            {
+            } else {
                 sideDistY += deltaDistY
                 mapY += stepY
                 side = true
             }
-            //Check if ray has hit a wall
-            hit = map.getWall(mapX, mapY) != 0
+            wall = map.getWall(mapX, mapY)
         }
 
-        //Calculate distance of perpendicular ray (Euclidean distance will give fisheye effect!)
-        val perpWallDist =
-                if (side)
-                    (mapY - posY + (1 - stepY) / 2) / rayDirY
-                else
-                    (mapX - posX + (1 - stepX) / 2) / rayDirX
+        // Calculate distance of perpendicular ray (Euclidean distance will give fisheye effect!)
+        val distance =
+                if(side) (mapY - playerPosition.y + (1 - stepY) / 2) / ray.y
+                else     (mapX - playerPosition.x + (1 - stepX) / 2) / ray.x
 
-        val textureX = 0.0        // TODO
-
-        return RayCastResult(map.getWall(mapX, mapY), if(side) Intersection.Bottom else Intersection.Left, perpWallDist, textureX)
-    }
-
-    private fun castRay(pixelX: Int): RayCastResult {
-        // TODO more efficient xy dda algorithm: use map square dx/dy steps to hop map squares,
-        //      instead of 'tracing the ray' with small steps. See https://lodev.org/cgtutor/raycasting.html
-        //      and https://youtu.be/eOCQfxRQ2pY?t=6m0s
-        //      That also makes the intersection test a lot simpler!?
-        val cameraPlaneRay = cameraPlane * (((pixelX fdiv pixwidth) - 0.5) * 2.0)
-        val castRay = playerDirection + cameraPlaneRay
-        val stepSize = 0.005   // decrease this to increase ray resolution
-        val rayStep = castRay * stepSize
-        var ray = playerPosition
-        var distance = 0.0     // distance perpendicular to the camera view plane
-        while (distance <= BLACK_DISTANCE) {
-            distance += stepSize
-            ray += rayStep
-            val square = mapSquare(ray.x, ray.y)
-            if (square > 0) {
-                val (side, tx, _) = intersectionWithMapsquareAccurate(playerPosition, ray)
-                return RayCastResult(square, side, distance, tx)
-            }
-        }
-        return RayCastResult(-1, Intersection.Top, distance, 0.0)
-    }
-
-    enum class Intersection {
-        Left,
-        Right,
-        Top,
-        Bottom
-    }
-
-    /**
-     * Cast_ray is the ray that we know intersects with a square.
-     * This method returns (side, wall texture sample coordinate, Vec2(intersect x, intersect y)).
-     */
-    private fun intersectionWithMapsquareAccurate(camera: Vec2d, cast_ray: Vec2d): Triple<Intersection, Double, Vec2d> {
-        // Note: this method is a bit slow, but very accurate.
-        // It always determines the correct quadrant/edge that is intersected,
-        // and calculates the texture sample coordinate based off the actual intersection point
-        // of the cast camera ray with that square's edge.
-        // We now first determine what quadrant of the square the camera is looking at,
-        // and based on the relative angle with the vertex, what edge of the square.
-        val intersects: Intersection
-        val direction = cast_ray - camera
-        val squareCenter = Vec2d(cast_ray.x.toInt() + 0.5, cast_ray.y.toInt() + 0.5)
-        if (camera.x < squareCenter.x) {
-            // left half of square
-            intersects = if (camera.y < squareCenter.y) {
-                val vertexAngle = ((squareCenter + Vec2d(-0.5, -0.5)) - camera).angle()
-                if (direction.angle() < vertexAngle) Intersection.Bottom else Intersection.Left
-            } else {
-                val vertexAngle = ((squareCenter + Vec2d(-0.5, 0.5)) - camera).angle()
-                if (direction.angle() < vertexAngle) Intersection.Left else Intersection.Top
-            }
+        return if(0 < distance && distance < BLACK_DISTANCE) {
+            // calculate texture X of wall (0.0 - 1.0)
+            val wallTexX =
+                    if(side) playerPosition.x + distance * ray.x
+                    else playerPosition.y + distance * ray.y
+            // wall_tex_x -= floor(wall_tex_x)
+            RayCastResult(wall, distance, wallTexX)
         } else {
-            // right half of square (need to flip some X's because of angle sign issue)
-            if (camera.y < squareCenter.y) {
-                val vertex = ((squareCenter + Vec2d(0.5, -0.5)) - camera)
-                vertex.x = -vertex.x
-                val posDir = Vec2d(-direction.x, direction.y)
-                intersects = if (posDir.angle() < vertex.angle()) Intersection.Bottom else Intersection.Right
-            } else {
-                val vertex = ((squareCenter + Vec2d(0.5, 0.5)) - camera)
-                vertex.x = -vertex.x
-                val posDir = Vec2d(-direction.x, direction.y)
-                intersects = if (posDir.angle() < vertex.angle()) Intersection.Right else Intersection.Top
-            }
-        }
-        // now calculate the exact x (and y) coordinates of the intersection with the square's edge
-        when (intersects) {
-            Intersection.Top -> {
-                val iy = squareCenter.y + 0.5
-                val ix = if (direction.y == 0.0) 0.0 else camera.x + (iy - camera.y) * direction.x / direction.y
-                return Triple(intersects, -ix, Vec2d(ix, iy))
-            }
-            Intersection.Bottom -> {
-                val iy = squareCenter.y - 0.5
-                val ix = if (direction.y == 0.0) 0.0 else camera.x + (iy - camera.y) * direction.x / direction.y
-                return Triple(intersects, ix, Vec2d(ix, iy))
-            }
-            Intersection.Left -> {
-                val ix = squareCenter.x - 0.5
-                val iy = if (direction.x == 0.0) 0.0 else camera.y + (ix - camera.x) * direction.y / direction.x
-                return Triple(intersects, -iy, Vec2d(ix, iy))
-            }
-            Intersection.Right -> {
-                val ix = squareCenter.x + 0.5
-                val iy = if (direction.x == 0.0) 0.0 else camera.y + (ix - camera.x) * direction.y / direction.x
-                return Triple(intersects, iy, Vec2d(ix, iy))
-            }
+            RayCastResult(-1, BLACK_DISTANCE, 0.0)
         }
     }
 
@@ -301,7 +191,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         return 255
     }
 
-    private fun drawColumn(x: Int, ceiling: Int, distance: Double, texture: Texture, tx: Double, side: Intersection) {
+    private fun drawColumn(x: Int, ceiling: Int, distance: Double, texture: Texture, tx: Double) {
         val startY = max(0, ceiling)
         val numPixels = pixheight - 2 * startY
         val wallHeight = pixheight - 2 * ceiling
