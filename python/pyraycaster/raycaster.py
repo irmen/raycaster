@@ -195,7 +195,7 @@ class Raycaster:
                 sprite_view_angle += 2*pi
             elif sprite_view_angle > pi:
                 sprite_view_angle -= 2*pi
-            if sprite_distance < self.BLACK_DISTANCE and abs(sprite_view_angle) < self.HVOF/2:
+            if sprite_distance < self.BLACK_DISTANCE and abs(sprite_view_angle) < self.HVOF/1.4:
                 texture, sprite_size = self.get_sprite_texture(mc)
                 middle_pixel_column = int((0.5*(sprite_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
