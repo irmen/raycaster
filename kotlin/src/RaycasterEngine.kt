@@ -1,5 +1,6 @@
 package net.razorvine.raycaster
 
+import org.w3c.dom.Text
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
@@ -263,6 +264,15 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             map.sprites.forEach { drawSprite(it, d_screen) }
     }
 
+    private fun getSpriteTexture(spritetype: Char): Pair<Texture, Double> {
+        return when (spritetype) {
+            'g' -> Pair(textures.getValue("creature-gargoyle"), 0.8)
+            'h' -> Pair(textures.getValue("creature-hero"), 0.7)
+            't' -> Pair(textures.getValue("treasure"), 0.6)
+            else -> throw NoSuchElementException("unknown sprite: $spritetype")
+        }
+    }
+
     private fun drawSprite(sprite: Map.Entry<Pair<Int, Int>, Char>, d_screen: Double) {
         val (mx, my) = sprite.key
         val mc = sprite.value
@@ -276,40 +286,25 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         else if (spriteViewAngle > PI)
             spriteViewAngle -= 2.0 * PI
         if (spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF / 2.0) {
-            val spriteSize: Double
-            val texture: Texture
-            when (mc) {
-                'g' -> {
-                    texture = textures.getValue("creature-gargoyle")
-                    spriteSize = 0.8
-                }
-                'h' -> {
-                    texture = textures.getValue("creature-hero")
-                    spriteSize = 0.7
-                }
-                't' -> {
-                    texture = textures.getValue("treasure")
-                    spriteSize = 0.6
-                }
-                else -> throw NoSuchElementException("unknown sprite: $mc")
-            }
+            val (texture, spriteSize) = getSpriteTexture(mc)
             val middlePixelColumn = ((0.5 * (spriteViewAngle / (HVOF / 2.0)) + 0.5) * pixwidth).toInt()
             val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
-            var ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
-            if (ceilingAboveSpriteSquare >= 0) {  // TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
-                val brightness = brightness(spritePerpendicularDistance)
-                var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2
-                val y_offset = ((1.0 - spriteSize) * pixelHeight).toInt()
-                ceilingAboveSpriteSquare += y_offset
-                pixelHeight = (spriteSize * pixelHeight).toInt()
-                val pixelWidth = pixelHeight
-                for (y in 0 until pixelHeight) {
-                    for (x in max(0, middlePixelColumn - pixelWidth / 2)
-                            until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
-                        val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, y fdiv pixelHeight)
-                        if ((tc ushr 24) > 200)   // consider alpha channel
-                            setPixel(x, y + ceilingAboveSpriteSquare, spritePerpendicularDistance, brightness, tc)
-                    }
+            if(spritePerpendicularDistance < 0.2)
+                return
+            val ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
+            val brightness = brightness(spritePerpendicularDistance)
+            var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2
+            var y_offset = ((1.0 - spriteSize) * pixelHeight).toInt() + ceilingAboveSpriteSquare
+            val tex_y_offset = if(y_offset < 0) abs(y_offset) else 0
+            y_offset = max(0, y_offset)
+            pixelHeight = (spriteSize * pixelHeight).toInt()
+            val pixelWidth = pixelHeight
+            for (y in 0 until pixelHeight) {
+                for (x in max(0, middlePixelColumn - pixelWidth / 2)
+                        until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
+                    val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, (y+tex_y_offset) fdiv pixelHeight)
+                    if ((tc ushr 24) > 200)   // consider alpha channel
+                        setPixel(x, y + y_offset, spritePerpendicularDistance, brightness, tc)
                 }
             }
         }

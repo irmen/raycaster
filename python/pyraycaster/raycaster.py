@@ -174,6 +174,16 @@ class Raycaster:
                     self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, ray.y))
                     self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, ray.y))
 
+    def get_sprite_texture(self, spritetype: str) -> Tuple[Texture, float]:
+        if spritetype == "g":
+            return self.textures["creature-gargoyle"], 0.8
+        elif spritetype == "h":
+            return self.textures["creature-hero"], 0.7
+        elif spritetype == "t":
+            return self.textures["treasure"], 0.6
+        else:
+            raise KeyError("unknown sprite: " + spritetype)
+
     def draw_sprites(self, d_screen: float) -> None:
         for (mx, my), mc in self.map.sprites.items():
             sprite_pos = Vec2(mx + 0.5, my + 0.5)
@@ -186,36 +196,27 @@ class Raycaster:
             elif sprite_view_angle > pi:
                 sprite_view_angle -= 2*pi
             if sprite_distance < self.BLACK_DISTANCE and abs(sprite_view_angle) < self.HVOF/2:
-                if mc == "g":
-                    texture = self.textures["creature-gargoyle"]
-                    sprite_size = 0.8
-                elif mc == "h":
-                    texture = self.textures["creature-hero"]
-                    sprite_size = 0.7
-                elif mc == "t":
-                    texture = self.textures["treasure"]
-                    sprite_size = 0.6
-                else:
-                    raise KeyError("unknown sprite: " + mc)
+                texture, sprite_size = self.get_sprite_texture(mc)
                 middle_pixel_column = int((0.5*(sprite_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
-                ceiling_above_sprite_square = int(self.pixheight *
-                                                  (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
-                if ceiling_above_sprite_square >= 0:
-                    # TODO: sprite clipping in y axis if they're getting to near, instead of just removing it altogether
-                    brightness = self.brightness(sprite_perpendicular_distance)
-                    pixel_height = self.pixheight - ceiling_above_sprite_square*2
-                    y_offset = int((1.0-sprite_size) * pixel_height)
-                    ceiling_above_sprite_square += y_offset
-                    pixel_height = int(sprite_size * pixel_height)
-                    pixel_width = pixel_height
-                    for y in range(pixel_height):
-                        for x in range(max(0, int(middle_pixel_column - pixel_width/2)),
-                                       min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
-                            tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, y/pixel_height)
-                            if tc[3] > 200:  # consider alpha channel
-                                self.set_pixel(x, y+ceiling_above_sprite_square,
-                                               sprite_perpendicular_distance, brightness, tc)
+                if sprite_perpendicular_distance < 0.2:
+                    continue
+                ceiling_above_sprite_square = int(self.pixheight * (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
+                pixel_height = self.pixheight - ceiling_above_sprite_square*2
+                y_offset = int((1.0-sprite_size) * pixel_height) + ceiling_above_sprite_square
+                tex_y_offset = 0
+                if y_offset < 0:
+                    tex_y_offset = abs(y_offset)
+                    y_offset = 0
+                brightness = self.brightness(sprite_perpendicular_distance)
+                pixel_height = int(sprite_size * pixel_height)
+                pixel_width = pixel_height
+                for y in range(min(pixel_height, self.pixheight-y_offset)):
+                    for x in range(max(0, int(middle_pixel_column - pixel_width/2)),
+                                   min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
+                        tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, (y+tex_y_offset)/pixel_height)
+                        if tc[3] > 200:  # consider alpha channel
+                            self.set_pixel(x, y+y_offset, sprite_perpendicular_distance, brightness, tc)
 
     def set_pixel(self, x: int, y: int, z: float, brightness: float, rgba: Optional[Tuple[int, int, int, int]]) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
