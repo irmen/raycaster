@@ -1,6 +1,5 @@
 package net.razorvine.raycaster
 
-import org.w3c.dom.Text
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
@@ -215,7 +214,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         // the horizontal spans are processed with multiple concurrent threads
         // (this part of the screen drawing is the most cpu intensive)
 
-        val mcs = ceilingSizes.max()
+        val mcs = ceilingSizes.maxOrNull()
         if (mcs == null || mcs <= 0)
             return
         val maxHeightPossible = (pixheight * (1.0 - screenDistance / BLACK_DISTANCE) / 2.0).toInt()
@@ -294,17 +293,17 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             val ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
             val brightness = brightness(spritePerpendicularDistance)
             var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2
-            var y_offset = ((1.0 - spriteSize) * pixelHeight).toInt() + ceilingAboveSpriteSquare
-            val tex_y_offset = if(y_offset < 0) abs(y_offset) else 0
-            y_offset = max(0, y_offset)
+            var yOffset = ((1.0 - spriteSize) * pixelHeight).toInt() + ceilingAboveSpriteSquare
+            val texYOffset = if(yOffset < 0) abs(yOffset) else 0
+            yOffset = max(0, yOffset)
             pixelHeight = (spriteSize * pixelHeight).toInt()
             val pixelWidth = pixelHeight
             for (y in 0 until pixelHeight) {
                 for (x in max(0, middlePixelColumn - pixelWidth / 2)
                         until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
-                    val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, (y+tex_y_offset) fdiv pixelHeight)
+                    val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, (y+texYOffset) fdiv pixelHeight)
                     if ((tc ushr 24) > 200)   // consider alpha channel
-                        setPixel(x, y + y_offset, spritePerpendicularDistance, brightness, tc)
+                        setPixel(x, y + yOffset, spritePerpendicularDistance, brightness, tc)
                 }
             }
         }

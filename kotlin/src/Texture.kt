@@ -4,7 +4,6 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.io.FileInputStream
 import java.io.InputStream
-import java.lang.IllegalArgumentException
 import javax.imageio.ImageIO
 
 
