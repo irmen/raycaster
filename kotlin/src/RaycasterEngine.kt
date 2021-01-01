@@ -298,7 +298,7 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             yOffset = max(0, yOffset)
             pixelHeight = (spriteSize * pixelHeight).toInt()
             val pixelWidth = pixelHeight
-            for (y in 0 until pixelHeight) {
+            for (y in 0 until min(pixheight-yOffset, pixelHeight)) {
                 for (x in max(0, middlePixelColumn - pixelWidth / 2)
                         until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
                     val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, (y+texYOffset) fdiv pixelHeight)
