@@ -23,7 +23,7 @@ class RaycasterGui {
     private val image = BufferedImage(PIXEL_WIDTH, PIXEL_HEIGHT, BufferedImage.TYPE_INT_RGB).also {it.accelerationPriority=1.0f}
     private val engine = RaycasterEngine(PIXEL_WIDTH, PIXEL_HEIGHT, image)
     private val minimap = MinimapCanvas(engine.map, 3)
-    private val window = Window("Kotlin Raycaster", minimap, image, engine)
+    private val window = Window("Kotlin/JVM Raycaster", minimap, image, engine)
     private val desiredRefreshRate: Int by lazy {
         var defaultRefreshRate = GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.displayMode.refreshRate
         if(defaultRefreshRate==0)
@@ -142,7 +142,13 @@ class RaycasterGui {
 
     private class Window(title: String, val minimap: MinimapCanvas, image: BufferedImage, val engine: RaycasterEngine) : JFrame(title) {
         private val canvas = PixelCanvas(image)
-        private val fpsLabel = JLabel("frame counter here").also { it.foreground = Color.GRAY; it.font=Font("Monospaced", Font.PLAIN, 12) }
+        private val fpsLabel = JLabel("frame counter here").also {
+            it.foreground = Color.GRAY
+            it.background = Color.DARK_GRAY
+            it.font=Font("Monospaced", Font.PLAIN, 12)
+            it.minimumSize = Dimension(200,100)
+            it.preferredSize = Dimension(200,100)
+        }
 
         init {
             layout = BorderLayout(0, 0)
@@ -156,7 +162,9 @@ class RaycasterGui {
             minimap.movePlayer(engine.playerPosition, engine.playerDirection, engine.cameraPlane)
             pack()
             setLocationRelativeTo(null)
+            isResizable = false
             isVisible = true
+            createBufferStrategy(2)
 
             addMouseMotionListener(MouseListener(this))
             addMouseListener(MouseListener(this))
