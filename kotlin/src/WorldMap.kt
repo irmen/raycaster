@@ -23,7 +23,7 @@ class WorldMap(mapdef: List<String>) {
             }
         }
         revmap.forEach {
-            map.add( it.map { c->if(c in '0'..'9') c.toByte()-48 else 0 }.toIntArray() )
+            map.add( it.map { c->if(c in '0'..'9') c.code-48 else 0 }.toIntArray() )
         }
     }
 
