@@ -5,6 +5,8 @@ from PIL import Image, ImageTk
 from .raycaster import Raycaster, Map
 
 
+# TODO port this to PyGame instead of using tkinter. That should result in a significant performance boost?
+
 class Minimap(tkinter.Canvas):
     SCALE = 20
 
@@ -154,7 +156,6 @@ class RaycasterWindow(tkinter.Tk):
                 ),
                 Image.NEAREST
             ),
-            (0, 0)
         )
 
     def redraw(self):
