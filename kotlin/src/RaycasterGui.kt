@@ -34,16 +34,37 @@ class RaycasterGui {
     init {
         val gameThread = Thread {
             val timeEpoch = System.currentTimeMillis()
-            var lastTime = timeEpoch
+            val frameTimeNs = 1_000_000_000L / desiredRefreshRate  // Nanoseconds per frame
+            var nextFrameTime = System.nanoTime() + frameTimeNs
             var frame = 0L
+            
             while(true) {
-                val curTime = System.currentTimeMillis()
-                if((curTime-lastTime) >= (1000/(desiredRefreshRate+1))) {
-                    frame++
-                    lastTime = curTime
-                    tick(curTime-timeEpoch, frame)
+                val currentTime = System.nanoTime()
+                
+                // If we're ahead of schedule, sleep until we're closer to the target time
+                if (currentTime < nextFrameTime) {
+                    val sleepTimeMs = (nextFrameTime - currentTime) / 1_000_000
+                    if (sleepTimeMs > 0) {
+                        try {
+                            Thread.sleep(sleepTimeMs)
+                        } catch (e: InterruptedException) {
+                            break
+                        }
+                    }
+                    
+                    // Busy-wait for remaining time for higher precision
+                    var remainingTime = nextFrameTime - System.nanoTime()
+                    while (remainingTime > 0) {
+                        remainingTime = nextFrameTime - System.nanoTime()
+                    }
                 }
-                Thread.sleep(1)
+                
+                // Execute the tick
+                val currentTimeMs = System.currentTimeMillis()
+                val timer = currentTimeMs - timeEpoch
+                tick(timer, frame++)
+                
+                nextFrameTime += frameTimeNs
             }
         }
         gameThread.start()
