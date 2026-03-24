@@ -21,7 +21,7 @@ class Raycaster:
         self.empty_zbuffer = [float("inf")] * pixheight * pixwidth
         self.zbuffer = self.empty_zbuffer[:]
         self.ceiling_sizes = [0] * pixwidth
-        self.image = Image.new('RGB', (pixwidth, pixheight), color=0)
+        self.image = Image.new("RGB", (pixwidth, pixheight), color=0)
         self.image_buf = self.image.load()
         self.textures = {
             "test": Texture("textures/test.png"),
@@ -31,19 +31,25 @@ class Raycaster:
             "wall-stone": Texture("textures/wall-stone.png"),
             "creature-gargoyle": Texture("textures/gargoyle.png"),
             "creature-hero": Texture("textures/legohero.png"),
-            "treasure": Texture("textures/treasure.png")
+            "treasure": Texture("textures/treasure.png"),
         }
-        self.wall_textures = [self.textures["test"], self.textures["wall-bricks"], self.textures["wall-stone"]]
+        self.wall_textures = [
+            self.textures["test"],
+            self.textures["wall-bricks"],
+            self.textures["wall-stone"],
+        ]
         self.frame = 0
         self.player_position = Vec2(0, 0)
         self.player_direction = Vec2(0, 1)
         self.camera_plane = Vec2(tan(self.HVOF / 2), 0)
         self.map = dungeon_map
-        self.player_position = Vec2(self.map.player_start[0]+0.5, self.map.player_start[1]+0.5)
+        self.player_position = Vec2(
+            self.map.player_start[0] + 0.5, self.map.player_start[1] + 0.5
+        )
 
     def tick(self, walltime_msec: float) -> None:
         self.frame += 1
-        self.zbuffer[:] = self.empty_zbuffer    # clear zbuffer
+        self.zbuffer[:] = self.empty_zbuffer  # clear zbuffer
         # cast a ray per pixel column on the screen!
         # (we end up redrawing all pixels of the screen, so no explicit clear is needed)
         # NOTE: multithreading is not useful because of Python's GIL
@@ -55,7 +61,9 @@ class Raycaster:
                 ceiling_size = int(self.pixheight * (1.0 - d_screen / distance) / 2.0)
                 self.ceiling_sizes[x] = ceiling_size
                 if wall > 0:
-                    self.draw_column(x, ceiling_size, distance, self.wall_textures[wall], texture_x)
+                    self.draw_column(
+                        x, ceiling_size, distance, self.wall_textures[wall], texture_x
+                    )
                 else:
                     self.draw_black_column(x, ceiling_size, distance)
             else:
@@ -67,7 +75,7 @@ class Raycaster:
         # code adapted from: https://lodev.org/cgtutor/raycasting.html
 
         # calculate ray position and direction
-        cameraX = 2.0 * pixel_x / self.pixwidth - 1.0   # x-coordinate in camera space
+        cameraX = 2.0 * pixel_x / self.pixwidth - 1.0  # x-coordinate in camera space
         ray = self.player_direction + self.camera_plane * cameraX
 
         # which box of the map we're in
@@ -99,7 +107,7 @@ class Raycaster:
 
         # perform DDA
         wall = 0
-        while wall==0:
+        while wall == 0:
             # jump to next map square, OR in x-direction, OR in y-direction
             if sideDistX < sideDistY:
                 sideDistX += deltaDistX
@@ -140,39 +148,60 @@ class Raycaster:
     def brightness(self, distance: float) -> float:
         return max(0.0, 1.0 - distance / self.BLACK_DISTANCE)
 
-    def draw_column(self, x: int, ceiling: int, distance: float,
-                    texture: Texture, tx: float) -> None:
+    def draw_column(
+        self, x: int, ceiling: int, distance: float, texture: Texture, tx: float
+    ) -> None:
         start_y = max(0, ceiling)
-        num_pixels = self.pixheight - 2*start_y
-        wall_height = self.pixheight - 2*ceiling
+        num_pixels = self.pixheight - 2 * start_y
+        wall_height = self.pixheight - 2 * ceiling
         brightness = self.brightness(distance)
-        for y in range(start_y, start_y+num_pixels):
-            self.set_pixel(x, y, distance, brightness, texture.sample(tx, (y-ceiling) / wall_height))
+        for y in range(start_y, start_y + num_pixels):
+            self.set_pixel(
+                x,
+                y,
+                distance,
+                brightness,
+                texture.sample(tx, (y - ceiling) / wall_height),
+            )
 
     def draw_black_column(self, x: int, ceiling: int, distance: float) -> None:
         start_y = max(0, ceiling)
-        num_pixels = self.pixheight - 2*start_y
-        for y in range(start_y, start_y+num_pixels):
+        num_pixels = self.pixheight - 2 * start_y
+        for y in range(start_y, start_y + num_pixels):
             self.set_pixel(x, y, distance, 1.0, (0, 0, 0, 0))
 
     def draw_floor_and_ceiling(self, ceiling_sizes: List[int], d_screen: float) -> None:
         mcs = max(ceiling_sizes)
         if mcs <= 0:
             return
-        max_height_possible = int(self.pixheight*(1.0-d_screen/self.BLACK_DISTANCE)/2.0)
+        max_height_possible = int(
+            self.pixheight * (1.0 - d_screen / self.BLACK_DISTANCE) / 2.0
+        )
         ceiling_tex = self.textures["ceiling"]
         floor_tex = self.textures["floor"]
         for y in range(min(mcs, max_height_possible)):
             sy = 0.5 - y / self.pixheight
-            d_ground = 0.5 * d_screen / sy    # how far, horizontally over the ground, is this away from us?
+            d_ground = (
+                0.5 * d_screen / sy
+            )  # how far, horizontally over the ground, is this away from us?
             brightness = self.brightness(d_ground)
             for x, h in enumerate(ceiling_sizes):
-                if y < h and d_ground < self.zbuffer[x+y*self.pixwidth]:
+                if y < h and d_ground < self.zbuffer[x + y * self.pixwidth]:
                     camera_plane_ray = (x / self.pixwidth - 0.5) * 2 * self.camera_plane
-                    ray = self.player_position + d_ground*(self.player_direction + camera_plane_ray)
+                    ray = self.player_position + d_ground * (
+                        self.player_direction + camera_plane_ray
+                    )
                     # we use the fact that the ceiling and floor are mirrored
-                    self.set_pixel(x, y, d_ground, brightness, ceiling_tex.sample(ray.x, ray.y))
-                    self.set_pixel(x, self.pixheight-y-1, d_ground, brightness, floor_tex.sample(ray.x, ray.y))
+                    self.set_pixel(
+                        x, y, d_ground, brightness, ceiling_tex.sample(ray.x, ray.y)
+                    )
+                    self.set_pixel(
+                        x,
+                        self.pixheight - y - 1,
+                        d_ground,
+                        brightness,
+                        floor_tex.sample(ray.x, ray.y),
+                    )
 
     def get_sprite_texture(self, spritetype: str) -> Tuple[Texture, float]:
         if spritetype == "g":
@@ -185,6 +214,35 @@ class Raycaster:
             raise KeyError("unknown sprite: " + spritetype)
 
     def draw_sprites(self, d_screen: float) -> None:
+        """
+        Draw billboard sprites (creatures, treasure) in the world.
+
+        Algorithm overview:
+        1. For each sprite in the map, compute its position relative to the player.
+        2. Calculate the angle between player direction and sprite direction (sprite_view_angle).
+        3. If sprite is within view angle and not too far, render it.
+
+        Screen position calculation:
+        - sprite_perpendicular_distance: actual distance to sprite projected perpendicular to view.
+        - The sprite is rendered as a vertical strip whose height scales with 1/distance.
+        - sprite_screen_x: projects sprite position onto camera plane to get exact screen X.
+        - middle_pixel_column: transforms sprite_screen_x into screen pixel column (0 to pixwidth).
+
+        Sprite size scaling:
+        - pixel_height is scaled by sprite_size (e.g., 0.8 for gargoyle) and 1/distance.
+        - This makes closer sprites appear larger, but not infinitely large (clamped via render_distance).
+
+        Y positioning (vertical placement relative to horizon):
+        - ceiling_above_sprite_square: how many pixels from top of screen to sprite's top edge.
+        - This is based on the perspective projection: farther objects have smaller ceiling_above_sprite_square.
+        - y_offset: additional adjustment based on sprite_size to make smaller sprites float at proper height.
+        - This prevents sprites from "floating" by anchoring them to the ground plane.
+
+        Clipping:
+        - If sprite goes off-screen left/right: x_start and x_end clamp to screen bounds.
+        - Texture sampling still uses unclipped coordinates (x_start_original) to avoid squishing.
+        - If sprite_perpendicular_distance < 0.2 (too close), skip rendering entirely.
+        """
         for (mx, my), mc in self.map.sprites.items():
             sprite_pos = Vec2(mx + 0.5, my + 0.5)
             sprite_vec = sprite_pos - self.player_position
@@ -192,53 +250,92 @@ class Raycaster:
             sprite_distance = sprite_vec.magnitude()
             sprite_view_angle = self.player_direction.angle() - sprite_direction
             if sprite_view_angle < -pi:
-                sprite_view_angle += 2*pi
+                sprite_view_angle += 2 * pi
             elif sprite_view_angle > pi:
-                sprite_view_angle -= 2*pi
-            if sprite_distance < self.BLACK_DISTANCE and abs(sprite_view_angle) < self.HVOF/1.4:
+                sprite_view_angle -= 2 * pi
+            if (
+                sprite_distance < self.BLACK_DISTANCE
+                and abs(sprite_view_angle) < self.HVOF / 1.4
+            ):
                 texture, sprite_size = self.get_sprite_texture(mc)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
                 if sprite_perpendicular_distance < 0.2:
                     continue
-                ceiling_above_sprite_square = int(self.pixheight * (1.0 - d_screen / sprite_perpendicular_distance) / 2.0)
-                pixel_height = self.pixheight - ceiling_above_sprite_square*2
-                y_offset = int((1.0-sprite_size) * pixel_height) + ceiling_above_sprite_square
+                render_distance = max(sprite_perpendicular_distance, 0.2)
+                ceiling_above_sprite_square = int(
+                    self.pixheight * (1.0 - d_screen / render_distance) / 2.0
+                )
+                pixel_height = self.pixheight - ceiling_above_sprite_square * 2
+                y_offset = (
+                    int((1.0 - sprite_size) * pixel_height)
+                    + ceiling_above_sprite_square
+                )
                 tex_y_offset = 0
                 if y_offset < 0:
                     tex_y_offset = abs(y_offset)
                     y_offset = 0
+                sprite_screen_x = (
+                    sprite_vec.x * self.player_direction.y
+                    - sprite_vec.y * self.player_direction.x
+                ) / sprite_perpendicular_distance
+                middle_pixel_column = int(
+                    (0.5 * sprite_screen_x / tan(self.HVOF / 2) + 0.5) * self.pixwidth
+                )
                 brightness = self.brightness(sprite_perpendicular_distance)
                 pixel_height = int(sprite_size * pixel_height)
                 pixel_width = pixel_height
-                # Calculate sprite's screen position based on its actual position in the cell
-                # Project the sprite position onto the camera plane to get exact screen X
-                sprite_screen_x = (sprite_vec.x * self.player_direction.y - sprite_vec.y * self.player_direction.x) / sprite_perpendicular_distance
-                middle_pixel_column = int((0.5 * sprite_screen_x / tan(self.HVOF / 2) + 0.5) * self.pixwidth)
-                for y in range(min(pixel_height, self.pixheight-y_offset)):
-                    for x in range(max(0, int(middle_pixel_column - pixel_width/2)),
-                                   min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
-                        tc = texture.sample((x-middle_pixel_column)/pixel_width - 0.5, (y+tex_y_offset)/pixel_height)
+                x_start_original = middle_pixel_column - pixel_width / 2
+                x_start = max(0, int(x_start_original))
+                x_end = min(self.pixwidth, int(middle_pixel_column + pixel_width / 2))
+                if x_start >= x_end:
+                    continue
+                for y in range(min(pixel_height, self.pixheight - y_offset)):
+                    for x in range(x_start, x_end):
+                        tc = texture.sample(
+                            (x - x_start_original) / pixel_width - 1.0,
+                            (y + tex_y_offset) / pixel_height,
+                        )
                         if tc[3] > 200:  # consider alpha channel
-                            self.set_pixel(x, y+y_offset, sprite_perpendicular_distance, brightness, tc)
+                            self.set_pixel(
+                                x,
+                                y + y_offset,
+                                sprite_perpendicular_distance,
+                                brightness,
+                                tc,
+                            )
 
-    def set_pixel(self, x: int, y: int, z: float, brightness: float, rgba: Optional[Tuple[int, int, int, int]]) -> None:
+    def set_pixel(
+        self,
+        x: int,
+        y: int,
+        z: float,
+        brightness: float,
+        rgba: Optional[Tuple[int, int, int, int]],
+    ) -> None:
         """Sets a pixel on the screen (if it is visible) and adjusts its z-buffer value.
         The pixel's brightness is adjusted as well.
         If rgba is None, the pixel is transparent instead of having a color."""
-        if rgba and z < self.zbuffer[x+y*self.pixwidth]:
-            self.zbuffer[x+y*self.pixwidth] = z
+        if rgba and z < self.zbuffer[x + y * self.pixwidth]:
+            self.zbuffer[x + y * self.pixwidth] = z
             if z > 0 and brightness != 1.0:
                 rgba = self.color_brightness(rgba, brightness)
             self.image_buf[x, y] = rgba
 
-    def color_brightness(self, rgba: Tuple[int, int, int, int], brightness: float) -> Tuple[int, int, int, int]:
+    def color_brightness(
+        self, rgba: Tuple[int, int, int, int], brightness: float
+    ) -> Tuple[int, int, int, int]:
         """adjust brightness of the color. brightness 0=pitch black, 1=normal"""
         # while theoretically it's more accurate to adjust the luminosity (by doing rgb->hls->rgb),
         # it's almost as good and a lot faster to just scale the r,g,b values themselves.
         # from colorsys import rgb_to_hls, hls_to_rgb
         # h, l, s = rgb_to_hls(*rgb)
         # r, g, b = hls_to_rgb(h, l*scale, s)
-        return int(rgba[0] * brightness), int(rgba[1] * brightness), int(rgba[2] * brightness), rgba[3]
+        return (
+            int(rgba[0] * brightness),
+            int(rgba[1] * brightness),
+            int(rgba[2] * brightness),
+            rgba[3],
+        )
 
     def move_player_forward_or_back(self, amount: float) -> None:
         new = self.player_position + amount * self.player_direction.normalized()
@@ -275,4 +372,4 @@ class Raycaster:
         self.rotate_player(0.0)
 
     def screen_distance(self):
-        return 0.5/(tan(self.HVOF/2) * self.pixheight/self.pixwidth)
+        return 0.5 / (tan(self.HVOF / 2) * self.pixheight / self.pixwidth)

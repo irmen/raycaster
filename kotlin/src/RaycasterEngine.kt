@@ -272,6 +272,35 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         }
     }
 
+    /**
+     * Draw billboard sprites (creatures, treasure) in the world.
+     *
+     * Algorithm overview:
+     * 1. For each sprite in the map, compute its position relative to the player.
+     * 2. Calculate the angle between player direction and sprite direction (spriteViewAngle).
+     * 3. If sprite is within view angle and not too far, render it.
+     *
+     * Screen position calculation:
+     * - spritePerpendicularDistance: actual distance to sprite projected perpendicular to view.
+     * - The sprite is rendered as a vertical strip whose height scales with 1/distance.
+     * - spriteScreenX: projects sprite position onto camera plane to get exact screen X.
+     * - middlePixelColumn: transforms spriteScreenX into screen pixel column (0 to pixwidth).
+     *
+     * Sprite size scaling:
+     * - pixelHeight is scaled by spriteSize (e.g., 0.8 for gargoyle) and 1/distance.
+     * - This makes closer sprites appear larger, but not infinitely large (clamped via renderDistance).
+     *
+     * Y positioning (vertical placement relative to horizon):
+     * - ceilingAboveSpriteSquare: how many pixels from top of screen to sprite's top edge.
+     * - This is based on the perspective projection: farther objects have smaller ceilingAboveSpriteSquare.
+     * - yOffset: additional adjustment based on spriteSize to make smaller sprites float at proper height.
+     * - This prevents sprites from "floating" by anchoring them to the ground plane.
+     *
+     * Clipping:
+     * - If sprite goes off-screen left/right: xStart and xEnd clamp to screen bounds.
+     * - Texture sampling still uses unclipped coordinates (xStartOriginal) to avoid squishing.
+     * - If spritePerpendicularDistance < 0.2 (too close), skip rendering entirely.
+     */
     private fun drawSprite(sprite: Map.Entry<Pair<Int, Int>, Char>, d_screen: Double) {
         val (mx, my) = sprite.key
         val mc = sprite.value
@@ -287,24 +316,29 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
         if (spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF / 1.4) {
             val (texture, spriteSize) = getSpriteTexture(mc)
             val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
-            if(spritePerpendicularDistance < 0.2)
+            if (spritePerpendicularDistance < 0.2)
                 return
+            val renderDistance = max(spritePerpendicularDistance, 0.2)
             // Calculate sprite's screen position based on its actual position in the cell
             // Project the sprite position onto the camera plane to get exact screen X
             val spriteScreenX = (spriteVec.x * playerDirection.y - spriteVec.y * playerDirection.x) / spritePerpendicularDistance
             val middlePixelColumn = ((0.5 * spriteScreenX / tan(HVOF / 2.0) + 0.5) * pixwidth).toInt()
-            val ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
+            val ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / renderDistance) / 2.0).toInt()
             val brightness = brightness(spritePerpendicularDistance)
             var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2
             var yOffset = ((1.0 - spriteSize) * pixelHeight).toInt() + ceilingAboveSpriteSquare
-            val texYOffset = if(yOffset < 0) abs(yOffset) else 0
+            val texYOffset = if (yOffset < 0) abs(yOffset) else 0
             yOffset = max(0, yOffset)
             pixelHeight = (spriteSize * pixelHeight).toInt()
             val pixelWidth = pixelHeight
-            for (y in 0 until min(pixheight-yOffset, pixelHeight)) {
-                for (x in max(0, middlePixelColumn - pixelWidth / 2)
-                        until min(pixwidth, middlePixelColumn + pixelWidth / 2)) {
-                    val tc = texture.sample(((x - middlePixelColumn) fdiv pixelWidth) - 0.5, (y+texYOffset) fdiv pixelHeight)
+            val xStartOriginal = middlePixelColumn - pixelWidth / 2.0
+            val xStart = max(0, xStartOriginal.toInt())
+            val xEnd = min(pixwidth, middlePixelColumn + pixelWidth / 2)
+            if (xStart >= xEnd)
+                return
+            for (y in 0 until min(pixheight - yOffset, pixelHeight)) {
+                for (x in xStart until xEnd) {
+                    val tc = texture.sample(((x - xStartOriginal) / pixelWidth) - 1.0, (y + texYOffset).toDouble() / pixelHeight)
                     if ((tc ushr 24) > 200)   // consider alpha channel
                         setPixel(x, y + yOffset, spritePerpendicularDistance, brightness, tc)
                 }

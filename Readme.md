@@ -26,7 +26,6 @@ The Kotlin/JVM version runs a lot faster and so it also uses a higher resolution
 
 ## Todo
 
-- sprite clipping instead of removal when they get to near
 - make the camera height flexible (instead of sitting exactly in the middle) - head bob ? jumping?
 
 
