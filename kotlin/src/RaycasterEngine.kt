@@ -286,10 +286,13 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             spriteViewAngle -= 2.0 * PI
         if (spriteDistance < BLACK_DISTANCE && abs(spriteViewAngle) < HVOF / 1.4) {
             val (texture, spriteSize) = getSpriteTexture(mc)
-            val middlePixelColumn = ((0.5 * (spriteViewAngle / (HVOF / 2.0)) + 0.5) * pixwidth).toInt()
             val spritePerpendicularDistance = spriteDistance * cos(spriteViewAngle)
             if(spritePerpendicularDistance < 0.2)
                 return
+            // Calculate sprite's screen position based on its actual position in the cell
+            // Project the sprite position onto the camera plane to get exact screen X
+            val spriteScreenX = (spriteVec.x * playerDirection.y - spriteVec.y * playerDirection.x) / spritePerpendicularDistance
+            val middlePixelColumn = ((0.5 * spriteScreenX / tan(HVOF / 2.0) + 0.5) * pixwidth).toInt()
             val ceilingAboveSpriteSquare = (pixheight * (1.0 - d_screen / spritePerpendicularDistance) / 2.0).toInt()
             val brightness = brightness(spritePerpendicularDistance)
             var pixelHeight = pixheight - ceilingAboveSpriteSquare * 2

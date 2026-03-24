@@ -197,7 +197,6 @@ class Raycaster:
                 sprite_view_angle -= 2*pi
             if sprite_distance < self.BLACK_DISTANCE and abs(sprite_view_angle) < self.HVOF/1.4:
                 texture, sprite_size = self.get_sprite_texture(mc)
-                middle_pixel_column = int((0.5*(sprite_view_angle/(self.HVOF/2))+0.5) * self.pixwidth)
                 sprite_perpendicular_distance = sprite_distance * cos(sprite_view_angle)
                 if sprite_perpendicular_distance < 0.2:
                     continue
@@ -211,6 +210,10 @@ class Raycaster:
                 brightness = self.brightness(sprite_perpendicular_distance)
                 pixel_height = int(sprite_size * pixel_height)
                 pixel_width = pixel_height
+                # Calculate sprite's screen position based on its actual position in the cell
+                # Project the sprite position onto the camera plane to get exact screen X
+                sprite_screen_x = (sprite_vec.x * self.player_direction.y - sprite_vec.y * self.player_direction.x) / sprite_perpendicular_distance
+                middle_pixel_column = int((0.5 * sprite_screen_x / tan(self.HVOF / 2) + 0.5) * self.pixwidth)
                 for y in range(min(pixel_height, self.pixheight-y_offset)):
                     for x in range(max(0, int(middle_pixel_column - pixel_width/2)),
                                    min(self.pixwidth, int(middle_pixel_column + pixel_width/2))):
