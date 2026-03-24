@@ -76,28 +76,28 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
             // Cast a ray per pixel column on the screen!
             // (we end up redrawing all pixels of the screen, so no explicit clear is needed)
             // Chunks of columns can be calculated in different threads.
-            val workers = (0 until pixwidth).chunked(pixwidth / numRenderThreads + 1).map { columns ->
-                Callable {
-                    for (x in columns) {
-                        val castResult = castRayDDA(x)
-                        if (castResult.distance > 0) {
-                            val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
-                            ceilingSizes[x] = ceilingSize
-                            if (castResult.squareContents > 0)
-                                drawColumn(x, ceilingSize, castResult.distance,
-                                        wallTextures[castResult.squareContents]!!, castResult.textureX)
-                            else
-                                drawBlackColumn(x, ceilingSize, castResult.distance)
-                        } else
-                            ceilingSizes[x] = 0
-                    }
-                }
+            val renderColumn: (Int) -> Unit = { x ->
+                val castResult = castRayDDA(x)
+                if (castResult.distance > 0) {
+                    val ceilingSize = (pixheight * (1.0 - scrDist / castResult.distance) / 2.0).toInt()
+                    ceilingSizes[x] = ceilingSize
+                    if (castResult.squareContents > 0)
+                        drawColumn(x, ceilingSize, castResult.distance,
+                                wallTextures[castResult.squareContents]!!, castResult.textureX)
+                    else
+                        drawBlackColumn(x, ceilingSize, castResult.distance)
+                } else
+                    ceilingSizes[x] = 0
             }
 
-            if(USE_MULTITHREADED_RENDERING)
+            if (USE_MULTITHREADED_RENDERING) {
+                val workers = (0 until pixwidth).chunked(pixwidth / numRenderThreads + 1).map { columns ->
+                    Callable { columns.forEach(renderColumn) }
+                }
                 renderThreadpool.invokeAll(workers)
-            else
-                workers.forEach { it.call() }
+            } else {
+                for (x in 0 until pixwidth) renderColumn(x)
+            }
         }
 
         durationCeilingFloorMs = measureTimeMillis {
@@ -221,24 +221,25 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
 
         val maxY = min(mcs, maxHeightPossible)
 
+        val ceilingTex = textures.getValue("ceiling")
+        val floorTex = textures.getValue("floor")
+
         if(USE_MULTITHREADED_RENDERING) {
             val workers = (0 until maxY).map { y ->
                 Callable {
-                    drawFloorCeilingSingleRow(y, screenDistance, ceilingSizes)
+                    drawFloorCeilingSingleRow(y, screenDistance, ceilingSizes, ceilingTex, floorTex)
                 }
             }
             renderThreadpool.invokeAll(workers)
         }
         else {
             for(y in 0 until maxY) {
-                drawFloorCeilingSingleRow(y, screenDistance, ceilingSizes)
+                drawFloorCeilingSingleRow(y, screenDistance, ceilingSizes, ceilingTex, floorTex)
             }
         }
     }
 
-    private fun drawFloorCeilingSingleRow(y: Int, screenDistance: Double, ceilingSizes: IntArray) {
-        val ceilingTex = textures.getValue("ceiling")
-        val floorTex = textures.getValue("floor")
+    private fun drawFloorCeilingSingleRow(y: Int, screenDistance: Double, ceilingSizes: IntArray, ceilingTex: Texture, floorTex: Texture) {
         val sy = 0.5 - (y fdiv pixheight)
         val groundDistance = 0.5 * screenDistance / sy    // how far, horizontally over the ground, is this away from us?
         val brightness = brightness(groundDistance)
@@ -373,12 +374,12 @@ class RaycasterEngine(private val pixwidth: Int, private val pixheight: Int, ima
      * it's almost as good and a lot faster to just scale the r,g,b values themselves.
      */
     private fun colorBrightness(argb: Int, brightness: Double): Int {
-        val alpha = argb and -16777216
-        val bri = (brightness * 256).toInt()
-        val red = (argb shr 16 and 255) * bri
-        val green = (argb shr 8 and 255) * bri
-        val blue = (argb and 255) * bri
-        return alpha or (red and 0x0000ff00 shl 8) or (green and 0x0000ff00) or (blue shr 8)
+        // Assumes source is fully opaque (alpha=0xff). Hardcodes alpha instead of
+        // preserving it, because all textures in this raycaster are opaque.
+        val r = ((argb shr 16 and 255) * brightness).toInt()
+        val g = ((argb shr 8 and 255) * brightness).toInt()
+        val b = ((argb and 255) * brightness).toInt()
+        return 0xff000000.toInt() or (r shl 16) or (g shl 8) or b
     }
 
     private fun screenDistance() = 0.5 / (tan(HVOF / 2.0) * pixheight / pixwidth)
